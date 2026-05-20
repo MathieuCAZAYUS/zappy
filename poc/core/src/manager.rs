@@ -1,26 +1,43 @@
-use crate::plugin::{CubeState, KeyEvent, PluginInstance};
+use crate::plugin::{KeyEvent, PluginInstance};
 use colored::*;
-use macroquad::prelude::*;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 use wasmtime::Engine;
+
+pub struct SharedEngineState {
+    pub cached_commands: Vec<(String, String)>,
+    pub reload_queue: Vec<Option<String>>,
+    pub logs_to_broadcast: Vec<String>,
+}
 
 pub struct PluginManager {
     engine: Engine,
-    pipeline: Vec<PluginInstance>,
+    pub pipeline: Vec<PluginInstance>,
+    pub shared: Arc<Mutex<SharedEngineState>>,
 }
 
 impl PluginManager {
     pub fn new(engine: Engine) -> Self {
-        let mut manager = Self {
+        let shared = Arc::new(Mutex::new(SharedEngineState {
+            cached_commands: Vec::new(),
+            reload_queue: Vec::new(),
+            logs_to_broadcast: Vec::new(),
+        }));
+        Self {
             engine,
             pipeline: Vec::new(),
-        };
-        manager.scan_and_load_all();
-        manager
+            shared,
+        }
     }
 
     pub fn scan_and_load_all(&mut self) {
         self.pipeline.clear();
+        if let Ok(mut s) = self.shared.lock() {
+            s.cached_commands.clear();
+        }
+
         let dir = Path::new("plugins");
         if !dir.exists() {
             return;
@@ -35,87 +52,54 @@ impl PluginManager {
         entries.sort();
 
         for path in entries {
-            if let Ok(plugin) = PluginInstance::load(&self.engine, &path) {
-                self.pipeline.push(plugin)
+            match PluginInstance::load(&self.engine, &path, self.shared.clone()) {
+                Ok(mut plugin) => {
+                    if let Ok(cmds) = plugin.bindings.call_get_commands(&mut plugin.store)
+                        && let Ok(mut s) = self.shared.lock()
+                    {
+                        for c in cmds {
+                            s.cached_commands.push((c.name, c.help));
+                        }
+                    }
+                    self.pipeline.push(plugin);
+                }
+                Err(e) => {
+                    eprintln!("{} loading {path:?}: {e}", "[ERROR]".red().bold());
+                }
             }
         }
     }
 
-    pub fn reload_plugin(&mut self, plugin_name: &str) {
-        let path = format!("plugins/{}.wasm", plugin_name);
+    pub fn reload_plugin(&mut self, name: &str) {
+        self.pipeline.retain(|p| p.name != name);
+        let path = format!("plugins/{name}.wasm");
 
-        self.pipeline.retain(|p| p.name != plugin_name);
-
-        match PluginInstance::load(&self.engine, Path::new(&path)) {
-            Ok(new_plugin) => {
-                self.pipeline.push(new_plugin);
-                self.pipeline.sort_by(|a, b| a.name.cmp(&b.name));
+        if let Ok(mut plugin) =
+            PluginInstance::load(&self.engine, Path::new(&path), self.shared.clone())
+        {
+            if let Ok(cmds) = plugin.bindings.call_get_commands(&mut plugin.store)
+                && let Ok(mut s) = self.shared.lock()
+            {
+                s.cached_commands.retain(|(p_name, _)| p_name != name);
+                for c in cmds {
+                    s.cached_commands.push((c.name, c.help));
+                }
             }
-            Err(e) => eprintln!(
-                "{} {} {} {e}",
-                "[WATCHER]".yellow().bold(),
-                plugin_name.italic(),
-                "is compiling or got an error:".bright_black()
-            ),
+            self.pipeline.push(plugin);
+            self.pipeline.sort_by(|a, b| a.name.cmp(&b.name));
         }
     }
 
     pub fn handle_inputs(&mut self, event: KeyEvent) {
-        let mut to_remove = Vec::new();
         let mut input_blocked = false;
-
-        for (index, plugin) in self.pipeline.iter_mut().enumerate() {
+        self.pipeline.retain_mut(|plugin| {
             if input_blocked {
-                break;
+                return true;
             }
-
             match plugin.bindings.call_handle_input(&mut plugin.store, &event) {
                 Ok(consumed) => {
                     if consumed {
-                        /*println!(
-                            "{}{} {} {}",
-                            "↳".bright_black(),
-                            "[INPUT]".bright_magenta().bold(),
-                            "blocked by".bright_black(),
-                            plugin.name.bright_black().underline()
-                        );*/
                         input_blocked = true;
-                    }
-                }
-                Err(e) => {
-                    eprintln!(
-                        "{} {} {} {} {e}",
-                        "[CRASH]".red().bold(),
-                        "Plugin".bright_black(),
-                        plugin.name.italic(),
-                        "panicked (Input):".bright_black()
-                    );
-                    to_remove.push(index);
-                }
-            }
-        }
-
-        for index in to_remove.into_iter().rev() {
-            self.pipeline.remove(index);
-        }
-    }
-
-    pub fn update_and_render(&mut self, state: CubeState) {
-        self.pipeline.retain_mut(|plugin| {
-            match plugin.bindings.call_update_cube(&mut plugin.store, state) {
-                Ok(cmd) => {
-                    if cmd.x != 0.0 || cmd.y != 0.0 {
-                        draw_rectangle_ex(
-                            (screen_width() / 2.0) + cmd.x - 25.0,
-                            (screen_height() / 2.0) + cmd.y - 25.0,
-                            50.0,
-                            50.0,
-                            DrawRectangleParams {
-                                rotation: cmd.rotation,
-                                color: SKYBLUE,
-                                ..Default::default()
-                            },
-                        );
                     }
                     true
                 }
@@ -125,11 +109,28 @@ impl PluginManager {
                         "[CRASH]".red().bold(),
                         "Plugin".bright_black(),
                         plugin.name.italic(),
-                        "panicked (Update):".bright_black()
+                        "panicked (Input):".bright_black()
                     );
                     false
                 }
             }
         });
+    }
+
+    pub fn broadcast_logs(&mut self) {
+        let logs = if let Ok(mut s) = self.shared.lock() {
+            std::mem::take(&mut s.logs_to_broadcast)
+        } else {
+            Vec::new()
+        };
+
+        for log in logs {
+            for plugin in &mut self.pipeline {
+                plugin
+                    .bindings
+                    .call_accept_log(&mut plugin.store, &log)
+                    .ok();
+            }
+        }
     }
 }

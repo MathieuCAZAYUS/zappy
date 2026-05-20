@@ -1,14 +1,28 @@
 package local:zappy;
 
 world plugin-world {
-    record cube-state { time: f32 }
-    record render-command { x: f32, y: f32, rotation: f32 }
-    export update-cube: func(state: cube-state) -> render-command;
+  import host-log: func(msg: string);
+  import host-system-command: func(cmd: string, args: list<string>) -> string;
 
-    variant key-event {
-        pressed(string),
-        released(string),
-    }
+  record color { r: u8, g: u8, b: u8, a: u8 }
+  record rect-cmd { x: f32, y: f32, w: f32, h: f32, color: color, rotation: f32 }
+  record text-cmd { text: string, x: f32, y: f32, size: f32, color: color }
 
-    export handle-input: func(event: key-event) -> bool;
+  variant render-command {
+    rect(rect-cmd),
+    text(text-cmd),
+  }
+
+  variant key-event {
+    pressed(string),
+    char-input(string),
+  }
+
+  export handle-input: func(event: key-event) -> bool;
+  export update-plugin: func(time: f32) -> list<render-command>;
+
+  record command-desc { name: string, help: string }
+  export get-commands: func() -> list<command-desc>;
+
+  export accept-log: func(msg: string);
 }

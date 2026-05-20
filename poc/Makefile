@@ -1,5 +1,4 @@
 PLUGINS = 	\
-	cube	\
 	console
 
 all: run
