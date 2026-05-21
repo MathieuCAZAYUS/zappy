@@ -2,6 +2,7 @@ mod manager;
 mod plugin;
 mod watcher;
 
+use colored::*;
 use macroquad::prelude::{Color as MQColor, *};
 use manager::PluginManager;
 use plugin::KeyEvent;
@@ -14,13 +15,15 @@ macro_rules! log_all {
         let msg = format!($($arg)*);
         println!("{msg}");
         if let Ok(mut s) = $manager.shared.lock() {
-            s.logs_to_broadcast.push(msg);
+            s.logs_to_broadcast.push(crate::plugin::parse_ansi_colors(&msg));
         }
     }};
 }
 
 #[macroquad::main("Zappy PoC")]
 async fn main() -> Result<(), anyhow::Error> {
+    colored::control::set_override(true);
+
     let mut config = Config::new();
     config.wasm_component_model(true);
     let engine = Engine::new(&config)?;
@@ -29,7 +32,12 @@ async fn main() -> Result<(), anyhow::Error> {
     manager.scan_and_load_all();
     let (reload_rx, _watcher) = watcher::setup()?;
 
-    log_all!(manager, "[SYSTEM] Core started successfully!");
+    log_all!(
+        manager,
+        "{} {}",
+        "[SYSTEM]".bright_blue().bold(),
+        "Core started successfully!".bright_black()
+    );
 
     loop {
         clear_background(MQColor::new(0.1, 0.1, 0.12, 1.0));
@@ -43,11 +51,23 @@ async fn main() -> Result<(), anyhow::Error> {
         for req in reloads {
             match req {
                 None => {
-                    log_all!(manager, "[SYSTEM] Reloading all plugins...");
+                    log_all!(
+                        manager,
+                        "{} {}",
+                        "[SYSTEM]".bright_blue().bold(),
+                        "Reloading all plugins...".bright_black()
+                    );
                     manager.scan_and_load_all();
                 }
                 Some(name) => {
-                    log_all!(manager, "[SYSTEM] Reloading plugin '{name}'");
+                    log_all!(
+                        manager,
+                        "{} {}{}{}",
+                        "[SYSTEM]".bright_blue().bold(),
+                        "Reloading plugin '".bright_black(),
+                        name.italic().bright_black(),
+                        "'".bright_black(),
+                    );
                     manager.reload_plugin(&name);
                 }
             }
@@ -55,7 +75,13 @@ async fn main() -> Result<(), anyhow::Error> {
 
         if let Ok(changed_plugin) = reload_rx.try_recv() {
             std::thread::sleep(std::time::Duration::from_millis(50));
-            log_all!(manager, "[WATCHER] File edit : {changed_plugin}");
+            log_all!(
+                manager,
+                "{} {} {}",
+                "[WATCHER]".bright_yellow().bold(),
+                "File edit:".bright_black(),
+                changed_plugin.italic().bright_black()
+            );
             manager.reload_plugin(&changed_plugin);
         }
 
@@ -69,17 +95,21 @@ async fn main() -> Result<(), anyhow::Error> {
             manager.handle_inputs(KeyEvent::Pressed("Backspace".into()));
         }
 
-        while let Some(c) = get_char_pressed() {
+        while let Some(c) = get_char_pressed()
+            && !c.is_control()
+        {
             manager.handle_inputs(KeyEvent::CharInput(c.to_string()));
         }
 
         manager.broadcast_logs();
 
         manager.pipeline.retain_mut(|plugin| {
-            match plugin
-                .bindings
-                .call_update_plugin(&mut plugin.store, get_time() as f32)
-            {
+            match plugin.bindings.call_update_plugin(
+                &mut plugin.store,
+                get_time() as f32,
+                screen_width(),
+                screen_height(),
+            ) {
                 Ok(cmds) => {
                     for cmd in cmds {
                         match cmd {
@@ -112,7 +142,14 @@ async fn main() -> Result<(), anyhow::Error> {
                     true
                 }
                 Err(e) => {
-                    log_all!(manager, "[CRASH] Shutting down {}: {e}", plugin.name);
+                    log_all!(
+                        manager,
+                        "{} {} {}{} {e}",
+                        "[CRASH]".red().bold(),
+                        "Shutting down".bright_black(),
+                        plugin.name.italic().bright_black(),
+                        ":".bright_black()
+                    );
                     false
                 }
             }

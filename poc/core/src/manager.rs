@@ -1,4 +1,4 @@
-use crate::plugin::{KeyEvent, PluginInstance};
+use crate::plugin::{KeyEvent, PluginInstance, TextSegment};
 use colored::*;
 use std::{
     path::{Path, PathBuf},
@@ -9,7 +9,7 @@ use wasmtime::Engine;
 pub struct SharedEngineState {
     pub cached_commands: Vec<(String, String)>,
     pub reload_queue: Vec<Option<String>>,
-    pub logs_to_broadcast: Vec<String>,
+    pub logs_to_broadcast: Vec<Vec<TextSegment>>,
 }
 
 pub struct PluginManager {
@@ -64,7 +64,13 @@ impl PluginManager {
                     self.pipeline.push(plugin);
                 }
                 Err(e) => {
-                    eprintln!("{} loading {path:?}: {e}", "[ERROR]".red().bold());
+                    eprintln!(
+                        "{} {} {}{} {e}",
+                        "[ERROR]".red().bold(),
+                        "loading".bright_black(),
+                        path.to_string_lossy().italic().bright_black(),
+                        ":".bright_black()
+                    );
                 }
             }
         }
@@ -108,7 +114,7 @@ impl PluginManager {
                         "{} {} {} {} {e}",
                         "[CRASH]".red().bold(),
                         "Plugin".bright_black(),
-                        plugin.name.italic(),
+                        plugin.name.italic().bright_black(),
                         "panicked (Input):".bright_black()
                     );
                     false

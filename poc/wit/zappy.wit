@@ -2,7 +2,7 @@ package local:zappy;
 
 world plugin-world {
   import host-log: func(msg: string);
-  import host-system-command: func(cmd: string, args: list<string>) -> string;
+  import host-system-command: func(cmd: string, args: list<string>) -> list<text-segment>;
 
   record color { r: u8, g: u8, b: u8, a: u8 }
   record rect-cmd { x: f32, y: f32, w: f32, h: f32, color: color, rotation: f32 }
@@ -19,10 +19,11 @@ world plugin-world {
   }
 
   export handle-input: func(event: key-event) -> bool;
-  export update-plugin: func(time: f32) -> list<render-command>;
+  export update-plugin: func(time: f32, w: f32, h: f32) -> list<render-command>;
 
   record command-desc { name: string, help: string }
   export get-commands: func() -> list<command-desc>;
 
-  export accept-log: func(msg: string);
+  record text-segment { text: string, color: color }
+  export accept-log: func(segments: list<text-segment>);
 }
