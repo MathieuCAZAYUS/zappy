@@ -441,7 +441,7 @@ impl ModuleInstance {
     pub fn call_get_commands(&mut self) -> Result<Vec<CommandDesc>, wasmtime::Error> {
         match &self.bindings {
             ModuleBindings::Ui(ui) => ui.call_get_commands(&mut self.store),
-            ModuleBindings::Cube(_) => Ok(Vec::new()),
+            ModuleBindings::Cube(cube) => cube.call_get_commands(&mut self.store),
         }
     }
 
