@@ -1,4 +1,4 @@
-use crate::plugin::{KeyEvent, PluginInstance, TextSegment};
+use crate::module::{KeyEvent, ModuleInstance, TextSegment};
 use colored::*;
 use std::{
     path::{Path, PathBuf},
@@ -7,23 +7,27 @@ use std::{
 use wasmtime::Engine;
 
 pub struct SharedEngineState {
-    pub cached_commands: Vec<(String, String)>,
+    pub cached_commands: Vec<(String, String, String, String)>,
+    pub loaded_modules: Vec<String>,
     pub reload_queue: Vec<Option<String>>,
     pub logs_to_broadcast: Vec<Vec<TextSegment>>,
+    pub command_queue: Vec<(String, Vec<String>)>,
 }
 
-pub struct PluginManager {
+pub struct ModuleManager {
     engine: Engine,
-    pub pipeline: Vec<PluginInstance>,
+    pub pipeline: Vec<ModuleInstance>,
     pub shared: Arc<Mutex<SharedEngineState>>,
 }
 
-impl PluginManager {
+impl ModuleManager {
     pub fn new(engine: Engine) -> Self {
         let shared = Arc::new(Mutex::new(SharedEngineState {
             cached_commands: Vec::new(),
+            loaded_modules: Vec::new(),
             reload_queue: Vec::new(),
             logs_to_broadcast: Vec::new(),
+            command_queue: Vec::new(),
         }));
         Self {
             engine,
@@ -36,9 +40,10 @@ impl PluginManager {
         self.pipeline.clear();
         if let Ok(mut s) = self.shared.lock() {
             s.cached_commands.clear();
+            s.loaded_modules.clear();
         }
 
-        let dir = Path::new("plugins");
+        let dir = Path::new("modules");
         if !dir.exists() {
             return;
         }
@@ -52,16 +57,22 @@ impl PluginManager {
         entries.sort();
 
         for path in entries {
-            match PluginInstance::load(&self.engine, &path, self.shared.clone()) {
-                Ok(mut plugin) => {
-                    if let Ok(cmds) = plugin.bindings.call_get_commands(&mut plugin.store)
-                        && let Ok(mut s) = self.shared.lock()
-                    {
-                        for c in cmds {
-                            s.cached_commands.push((c.name, c.help));
+            match ModuleInstance::load(&self.engine, &path, self.shared.clone()) {
+                Ok(mut module) => {
+                    if let Ok(mut s) = self.shared.lock() {
+                        s.loaded_modules.push(module.name.clone());
+                        if let Ok(cmds) = module.call_get_commands() {
+                            for c in cmds {
+                                s.cached_commands.push((
+                                    module.name.clone(),
+                                    c.name,
+                                    c.options,
+                                    c.help,
+                                ));
+                            }
                         }
                     }
-                    self.pipeline.push(plugin);
+                    self.pipeline.push(module);
                 }
                 Err(e) => {
                     eprintln!(
@@ -76,33 +87,40 @@ impl PluginManager {
         }
     }
 
-    pub fn reload_plugin(&mut self, name: &str) {
+    pub fn reload_module(&mut self, name: &str) {
         self.pipeline.retain(|p| p.name != name);
-        let path = format!("plugins/{name}.wasm");
+        let path = format!("modules/{name}.wasm");
 
-        if let Ok(mut plugin) =
-            PluginInstance::load(&self.engine, Path::new(&path), self.shared.clone())
+        if let Ok(mut s) = self.shared.lock() {
+            s.cached_commands.retain(|(p_name, _, _, _)| p_name != name);
+            s.loaded_modules.retain(|m| m != name);
+        }
+
+        if let Ok(mut module) =
+            ModuleInstance::load(&self.engine, Path::new(&path), self.shared.clone())
         {
-            if let Ok(cmds) = plugin.bindings.call_get_commands(&mut plugin.store)
-                && let Ok(mut s) = self.shared.lock()
-            {
-                s.cached_commands.retain(|(p_name, _)| p_name != name);
-                for c in cmds {
-                    s.cached_commands.push((c.name, c.help));
+            if let Ok(mut s) = self.shared.lock() {
+                s.loaded_modules.push(module.name.clone());
+                s.loaded_modules.sort();
+                if let Ok(cmds) = module.call_get_commands() {
+                    for c in cmds {
+                        s.cached_commands
+                            .push((module.name.clone(), c.name, c.options, c.help));
+                    }
                 }
             }
-            self.pipeline.push(plugin);
+            self.pipeline.push(module);
             self.pipeline.sort_by(|a, b| a.name.cmp(&b.name));
         }
     }
 
     pub fn handle_inputs(&mut self, event: KeyEvent) {
         let mut input_blocked = false;
-        self.pipeline.retain_mut(|plugin| {
+        self.pipeline.retain_mut(|module| {
             if input_blocked {
                 return true;
             }
-            match plugin.bindings.call_handle_input(&mut plugin.store, &event) {
+            match module.call_handle_input(&event) {
                 Ok(consumed) => {
                     if consumed {
                         input_blocked = true;
@@ -113,8 +131,8 @@ impl PluginManager {
                     eprintln!(
                         "{} {} {} {} {e}",
                         "[CRASH]".red().bold(),
-                        "Plugin".bright_black(),
-                        plugin.name.italic().bright_black(),
+                        "Module".bright_black(),
+                        module.name.italic().bright_black(),
                         "panicked (Input):".bright_black()
                     );
                     false
@@ -131,11 +149,8 @@ impl PluginManager {
         };
 
         for log in logs {
-            for plugin in &mut self.pipeline {
-                plugin
-                    .bindings
-                    .call_accept_log(&mut plugin.store, &log)
-                    .ok();
+            for module in &mut self.pipeline {
+                module.call_accept_log(&log).ok();
             }
         }
     }

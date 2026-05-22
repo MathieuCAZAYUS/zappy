@@ -1,0 +1,8 @@
+package local:zappy;
+
+interface input {
+  variant key-event {
+    pressed(string),
+    char-input(string),
+  }
+}

@@ -1,9 +1,14 @@
 wit_bindgen::generate!({
-    path: "../wit",
-    world: "plugin-world"
+    path: "../../wit",
+    world: "ui-world"
 });
 
 use std::sync::Mutex;
+
+use crate::local::zappy::{
+    graphic::{Color, RectCmd, TextCmd},
+    host_api::host_system_command,
+};
 static CONSOLE: Mutex<ConsoleState> = Mutex::new(ConsoleState {
     opened: false,
     input: String::new(),
@@ -63,9 +68,9 @@ fn split_segments_by_lines(segments: Vec<TextSegment>) -> Vec<Vec<TextSegment>> 
     lines
 }
 
-struct Plugin;
+struct Module;
 
-impl Guest for Plugin {
+impl Guest for Module {
     fn handle_input(event: KeyEvent) -> bool {
         let mut state = CONSOLE.lock().unwrap();
 
@@ -120,7 +125,11 @@ impl Guest for Plugin {
         state.opened
     }
 
-    fn update_plugin(_time: f32, w: f32, h: f32) -> Vec<RenderCommand> {
+    fn run_command(_cmd: String, _args: Vec<String>) -> ResponseCommand {
+        ResponseCommand::Unknown
+    }
+
+    fn update_module(_time: f32, _dt: f32, w: f32, h: f32) -> Vec<RenderCommand> {
         let state = CONSOLE.lock().unwrap();
         if !state.opened {
             return Vec::new();
@@ -215,4 +224,4 @@ impl Guest for Plugin {
     }
 }
 
-export!(Plugin);
+export!(Module);

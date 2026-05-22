@@ -1,0 +1,37 @@
+package local:zappy;
+
+interface host-api {
+  use system.{text-segment};
+
+  host-log: func(msg: string);
+  host-system-command: func(cmd: string, args: list<string>) -> list<text-segment>;
+}
+
+world ui-world {
+  import host-api;
+
+  use input.{key-event};
+  use graphic.{render-command};
+  use command.{command-desc, response-command};
+  use system.{text-segment};
+
+  export handle-input: func(event: key-event) -> bool;
+  export run-command: func(cmd: string, args: list<string>) -> response-command;
+  export update-module: func(time: f32, dt: f32, w: f32, h: f32) -> list<render-command>;
+
+  export get-commands: func() -> list<command-desc>;
+  export accept-log: func(segments: list<text-segment>);
+}
+
+world cube-world {
+  import host-api;
+
+  use input.{key-event};
+  use graphic.{render-command};
+  use command.{command-desc, response-command};
+
+  export handle-input: func(event: key-event) -> bool;
+  export get-commands: func() -> list<command-desc>;
+  export run-command: func(cmd: string, args: list<string>) -> response-command;
+  export update-module: func(time: f32, dt: f32, w: f32, h: f32) -> list<render-command>;
+}

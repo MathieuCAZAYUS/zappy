@@ -20,7 +20,7 @@ pub fn setup() -> Result<(Receiver<String>, notify::RecommendedWatcher), anyhow:
             }
         })?;
 
-    std::fs::create_dir_all("plugins").ok();
-    watcher.watch(Path::new("plugins"), RecursiveMode::NonRecursive)?;
+    std::fs::create_dir_all("modules").ok();
+    watcher.watch(Path::new("modules"), RecursiveMode::NonRecursive)?;
     Ok((rx, watcher))
 }
