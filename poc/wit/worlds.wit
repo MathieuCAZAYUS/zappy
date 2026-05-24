@@ -7,6 +7,10 @@ interface host-api {
   host-system-command: func(cmd: string, args: list<string>) -> list<text-segment>;
 
   emit-event: func(event-name: string, payload: string);
+  host-subscribe: func(event-name: string);
+
+  host-set-state: func(key: string, value: list<u8>);
+  host-get-state: func(key: string) -> option<list<u8>>;
 }
 
 world ui-world {

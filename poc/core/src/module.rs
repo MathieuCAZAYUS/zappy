@@ -158,6 +158,7 @@ pub fn parse_ansi_colors(input: &str) -> Vec<TextSegment> {
 }
 
 pub struct HostState {
+    pub module_name: String,
     pub shared: Arc<Mutex<SharedEngineState>>,
     pub wasi_ctx: WasiCtx,
     pub table: ResourceTable,
@@ -188,6 +189,29 @@ impl ui_plugin::local::zappy::host_api::Host for HostState {
             s.event_queue.push((event_name, payload));
         }
     }
+    fn host_subscribe(&mut self, event_name: String) {
+        if let Ok(mut s) = self.shared.lock() {
+            let subs = s
+                .event_subscriptions
+                .entry(event_name)
+                .or_insert_with(Vec::new);
+            if !subs.contains(&self.module_name) {
+                subs.push(self.module_name.clone());
+            }
+        }
+    }
+    fn host_set_state(&mut self, key: String, value: Vec<u8>) {
+        if let Ok(mut s) = self.shared.lock() {
+            s.kv_store.insert(key, value);
+        }
+    }
+    fn host_get_state(&mut self, key: String) -> Option<Vec<u8>> {
+        if let Ok(s) = self.shared.lock() {
+            s.kv_store.get(&key).cloned()
+        } else {
+            None
+        }
+    }
 }
 
 impl cube_plugin::local::zappy::host_api::Host for HostState {
@@ -200,6 +224,29 @@ impl cube_plugin::local::zappy::host_api::Host for HostState {
     fn emit_event(&mut self, event_name: String, payload: String) {
         if let Ok(mut s) = self.shared.lock() {
             s.event_queue.push((event_name, payload));
+        }
+    }
+    fn host_subscribe(&mut self, event_name: String) {
+        if let Ok(mut s) = self.shared.lock() {
+            let subs = s
+                .event_subscriptions
+                .entry(event_name)
+                .or_insert_with(Vec::new);
+            if !subs.contains(&self.module_name) {
+                subs.push(self.module_name.clone());
+            }
+        }
+    }
+    fn host_set_state(&mut self, key: String, value: Vec<u8>) {
+        if let Ok(mut s) = self.shared.lock() {
+            s.kv_store.insert(key, value);
+        }
+    }
+    fn host_get_state(&mut self, key: String) -> Option<Vec<u8>> {
+        if let Ok(s) = self.shared.lock() {
+            s.kv_store.get(&key).cloned()
+        } else {
+            None
         }
     }
 }
@@ -385,6 +432,7 @@ impl ModuleInstance {
         let mut store = Store::new(
             engine,
             HostState {
+                module_name: name.clone(),
                 shared: shared.clone(),
                 wasi_ctx,
                 table: ResourceTable::new(),
@@ -409,6 +457,7 @@ impl ModuleInstance {
         let mut store = Store::new(
             engine,
             HostState {
+                module_name: name.clone(),
                 shared,
                 wasi_ctx,
                 table: ResourceTable::new(),

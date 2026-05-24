@@ -1,6 +1,7 @@
 use crate::module::{EngineContext, InputState, ModuleInstance, TextSegment};
 use colored::*;
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -13,6 +14,19 @@ pub struct SharedEngineState {
     pub logs_to_broadcast: Vec<Vec<TextSegment>>,
     pub command_queue: Vec<(String, Vec<String>)>,
     pub event_queue: Vec<(String, String)>,
+    pub event_subscriptions: HashMap<String, Vec<String>>,
+    pub kv_store: HashMap<String, Vec<u8>>,
+}
+
+impl SharedEngineState {
+    pub fn cleanup_module(&mut self, name: &str) {
+        self.cached_commands
+            .retain(|(p_name, _, _, _)| p_name != name);
+        self.loaded_modules.retain(|m| m != name);
+        for subs in self.event_subscriptions.values_mut() {
+            subs.retain(|m| m != name);
+        }
+    }
 }
 
 pub struct ModuleManager {
@@ -31,6 +45,8 @@ impl ModuleManager {
             logs_to_broadcast: Vec::new(),
             command_queue: Vec::new(),
             event_queue: Vec::new(),
+            event_subscriptions: HashMap::new(),
+            kv_store: HashMap::new(),
         }));
         Self {
             engine,
@@ -45,6 +61,7 @@ impl ModuleManager {
         if let Ok(mut s) = self.shared.lock() {
             s.cached_commands.clear();
             s.loaded_modules.clear();
+            s.event_subscriptions.clear();
         }
 
         let dir = Path::new("modules");
@@ -83,7 +100,7 @@ impl ModuleManager {
                         "{} {} {}{} {e}",
                         "[ERROR]".red().bold(),
                         "loading".bright_black(),
-                        path.to_string_lossy().italic().bright_black(),
+                        path.to_string_lossy().italic().bright_blue().bold(),
                         ":".bright_black()
                     );
                 }
@@ -99,6 +116,10 @@ impl ModuleManager {
 
         self.pipeline.retain(|p| p.name != name);
         let path = format!("modules/{name}.wasm");
+
+        if let Ok(mut s) = self.shared.lock() {
+            s.cleanup_module(name);
+        }
 
         if let Ok(mut s) = self.shared.lock() {
             s.cached_commands.retain(|(p_name, _, _, _)| p_name != name);
@@ -166,24 +187,36 @@ impl ModuleManager {
 
     pub fn dispatch_events(&mut self) {
         let mut events = Vec::new();
+        let mut subs_map = HashMap::new();
+
         if let Ok(mut s) = self.shared.lock() {
             events = std::mem::take(&mut s.event_queue);
+            subs_map = s.event_subscriptions.clone();
         }
 
         for (event_name, payload) in events {
+            let subscribers = subs_map.get(&event_name).cloned().unwrap_or_default();
+
             self.pipeline.retain_mut(|module| {
-                match module.call_handle_event(&event_name, &payload) {
-                    Ok(_) => true,
-                    Err(e) => {
-                        eprintln!(
-                            "{} {} {} {} {e}",
-                            "[CRASH]".red().bold(),
-                            "Module".bright_black(),
-                            module.name.italic().bright_blue().bold(),
-                            "failed to handle event:".bright_black(),
-                        );
-                        false
+                if subscribers.contains(&module.name) {
+                    match module.call_handle_event(&event_name, &payload) {
+                        Ok(_) => true,
+                        Err(e) => {
+                            eprintln!(
+                                "{} {} {} {} {e}",
+                                "[CRASH]".red().bold(),
+                                "Module".bright_black(),
+                                module.name.italic().bright_blue().bold(),
+                                "failed to handle event:".bright_black(),
+                            );
+                            if let Ok(mut s) = module.store.data().shared.lock() {
+                                s.cleanup_module(&module.name);
+                            }
+                            false
+                        }
                     }
+                } else {
+                    true
                 }
             });
         }
