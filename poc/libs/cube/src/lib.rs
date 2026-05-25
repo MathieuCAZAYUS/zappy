@@ -8,6 +8,8 @@ use std::{f32::consts::PI, ops::Deref, sync::Mutex};
 use serde::{Deserialize, Serialize};
 
 use crate::local::zappy::{
+    graphic::{Color, RectCmd, SpriteCmd},
+    host_api::emit_event,
     graphic::{Color, RectCmd},
     host_api::{emit_event, host_get_state},
 };
@@ -243,6 +245,23 @@ impl Guest for Module {
                     a: 255,
                 },
                 rotation: 0.0,
+            }),
+            RenderCommand::Sprite(SpriteCmd {
+                path: "player.png".to_string(),
+                x: data.offsets.0 + 40.0,
+                y: data.offsets.1 + 40.0,
+                w: 200.0,
+                h: 300.0,
+                source: None,
+                color: Color {
+                    r: 255,
+                    g: 255,
+                    b: 255,
+                    a: 255,
+                },
+                rotation: 0.0,
+                flip_x: false,
+                flip_y: false,
             }),
         ]
     }

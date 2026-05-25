@@ -1,11 +1,13 @@
 mod manager;
 mod module;
+mod sprite_loader;
 mod watcher;
 
 use colored::*;
 use macroquad::prelude::{Color as MQColor, *};
 use manager::ModuleManager;
 use module::{EngineContext, InputAction, InputState, ResponseCommand};
+use sprite_loader::SpriteLoader;
 use wasmtime::{Config, Engine};
 
 use crate::module::RenderCommand;
@@ -29,6 +31,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let engine = Engine::new(&config)?;
 
     let mut manager = ModuleManager::new(engine);
+    let mut sprite_loader = SpriteLoader::new();
     manager.scan_and_load_all();
     let (reload_rx, _watcher) = watcher::setup()?;
 
@@ -231,6 +234,36 @@ async fn main() -> Result<(), anyhow::Error> {
                                     MQColor::from_rgba(t.color.r, t.color.g, t.color.b, t.color.a),
                                 );
                             }
+                            RenderCommand::Sprite(s) => match sprite_loader.texture(&s.path) {
+                                Ok(texture) => {
+                                    draw_texture_ex(
+                                        texture,
+                                        s.x,
+                                        s.y,
+                                        MQColor::from_rgba(
+                                            s.color.r, s.color.g, s.color.b, s.color.a,
+                                        ),
+                                        DrawTextureParams {
+                                            dest_size: Some(vec2(s.w, s.h)),
+                                            source: s
+                                                .source
+                                                .map(|src| Rect::new(src.x, src.y, src.w, src.h)),
+                                            rotation: s.rotation,
+                                            flip_x: s.flip_x,
+                                            flip_y: s.flip_y,
+                                            ..Default::default()
+                                        },
+                                    );
+                                }
+                                Err(e) => {
+                                    log_all!(
+                                        manager,
+                                        "{} {}",
+                                        "[SPRITE]".yellow().bold(),
+                                        e.bright_black()
+                                    );
+                                }
+                            },
                         }
                     }
                     true
