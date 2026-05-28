@@ -1,18 +1,18 @@
 mod graphic;
+mod input_manager;
 mod manager;
 mod module;
 mod watcher;
 
 use colored::*;
-use macroquad::{
-    input::set_cursor_grab,
-    prelude::{Color as MQColor, *},
-};
+use macroquad::prelude::{Color as MQColor, *};
 use manager::ModuleManager;
-use module::{EngineContext, InputAction, InputState, ResponseCommand};
+use module::ResponseCommand;
 use wasmtime::{Config, Engine};
 
-use crate::module::{RenderCommand, cube_plugin::__with_name2::Delta};
+use crate::module::RenderCommand;
+
+const MAX_CMDS_CAPACITY: usize = 128;
 
 macro_rules! log_all {
     ($manager:expr, $($arg:tt)*) => {{
@@ -50,7 +50,7 @@ fn handle_module_reloads(
                     "{} {}{}{}",
                     "[SYSTEM]".bright_blue().bold(),
                     "Reloading module '".bright_black(),
-                    name.italic().bright_blue().black(),
+                    name.italic().bright_blue().bold(),
                     "'".bright_black()
                 );
                 manager.reload_module(&name);
@@ -130,83 +130,6 @@ fn pending_commands(manager: &mut ModuleManager) {
     }
 }
 
-fn process_input(manager: &mut ModuleManager) -> InputState {
-    let mut actions = Vec::new();
-    if is_key_pressed(KeyCode::F1) {
-        actions.push(InputAction::ToggleConsole);
-    }
-    if is_key_pressed(KeyCode::Enter) {
-        actions.push(InputAction::Confirm);
-    }
-    if is_key_pressed(KeyCode::Backspace) {
-        actions.push(InputAction::Delete);
-    }
-    if is_key_pressed(KeyCode::Up) {
-        actions.push(InputAction::NavigateUp);
-    }
-    if is_key_down(KeyCode::Up) {
-        actions.push(InputAction::MoveUp);
-        actions.push(InputAction::MoveForward);
-    }
-    if is_key_pressed(KeyCode::Down) {
-        actions.push(InputAction::NavigateDown);
-    }
-    if is_key_down(KeyCode::Down) {
-        actions.push(InputAction::MoveDown);
-        actions.push(InputAction::MoveBackward);
-    }
-    if is_key_down(KeyCode::Left) {
-        actions.push(InputAction::MoveLeft);
-    }
-    if is_key_down(KeyCode::Right) {
-        actions.push(InputAction::MoveRight);
-    }
-    if is_mouse_button_pressed(MouseButton::Left) {
-        actions.push(InputAction::PrimaryAction);
-    }
-
-    let (_, scroll_y) = mouse_wheel();
-    if scroll_y > 0.0 {
-        actions.push(InputAction::ScrollUp);
-    } else if scroll_y < 0.0 {
-        actions.push(InputAction::ScrollDown);
-    }
-
-    let mut raw_chars = String::new();
-    while let Some(c) = get_char_pressed() {
-        if !c.is_control() {
-            raw_chars.push(c);
-        }
-    }
-
-    if actions.contains(&InputAction::ToggleConsole) {
-        manager.context = match manager.context {
-            EngineContext::Gameplay => EngineContext::UiConsole,
-            EngineContext::UiConsole => EngineContext::Gameplay,
-        };
-    }
-
-    let is_gameplay = manager.context == EngineContext::Gameplay;
-    set_cursor_grab(is_gameplay);
-    show_mouse(!is_gameplay);
-
-    let mouse_d = if manager.context == EngineContext::Gameplay {
-        mouse_delta_position()
-    } else {
-        macroquad::math::Vec2::new(0.0, 0.0)
-    };
-
-    InputState {
-        context: manager.context,
-        actions,
-        raw_chars,
-        mouse_delta: Delta {
-            x: mouse_d.x,
-            y: mouse_d.y,
-        },
-    }
-}
-
 fn render_scene_pipeline(all_cmds: &[Vec<RenderCommand>]) {
     clear_background(MQColor::new(0.1, 0.1, 0.12, 1.0));
 
@@ -272,6 +195,10 @@ async fn main() -> Result<(), anyhow::Error> {
     manager.scan_and_load_all();
     let (reload_rx, _watcher) = watcher::setup()?;
 
+    let mut input_manager = input_manager::InputManager::new();
+
+    let mut all_cmds = Vec::with_capacity(MAX_CMDS_CAPACITY);
+
     log_all!(
         manager,
         "{} {}",
@@ -280,7 +207,7 @@ async fn main() -> Result<(), anyhow::Error> {
     );
 
     loop {
-        let input_state = process_input(&mut manager);
+        let input_state = input_manager.process(&mut manager.context);
         handle_module_reloads(&mut manager, &reload_rx);
         pending_commands(&mut manager);
 
@@ -288,7 +215,7 @@ async fn main() -> Result<(), anyhow::Error> {
         manager.dispatch_events();
         manager.broadcast_logs();
 
-        let mut all_cmds = Vec::new();
+        all_cmds.clear();
         update_modules_pipeline(&mut manager, &mut all_cmds);
         render_scene_pipeline(&all_cmds);
         next_frame().await;

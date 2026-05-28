@@ -6,7 +6,7 @@ wit_bindgen::generate!({
 use std::sync::Mutex;
 
 use crate::local::zappy::{
-    graphic::{Color, RectCmd, TextAlign, TextCmd},
+    graphic::{Color, RectCmd},
     host_api::{host_log, host_subscribe},
 };
 static CROSSHAIR_ACTIVE: Mutex<bool> = Mutex::new(false);

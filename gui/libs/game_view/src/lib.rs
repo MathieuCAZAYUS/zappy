@@ -520,6 +520,9 @@ impl Guest for Module {
     }
 
     fn handle_input(state: InputState) {
+        if state.context != EngineContext::Gameplay {
+            return;
+        }
         let mut c = CAMERA.lock().unwrap();
         let mut grab_state = GRAB_STATE.lock().unwrap();
         let cubes = CUBES.lock().unwrap();
