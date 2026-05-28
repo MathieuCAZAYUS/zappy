@@ -40,6 +40,13 @@ pub fn render_3d_command(cmd: &RenderCommand) {
                 to_mq_color(&g.color1),
             );
         }
+        RenderCommand::Line3d(l) => {
+            draw_line_3d(
+                vec3(l.start.x, l.start.y, l.start.z),
+                vec3(l.end.x, l.end.y, l.end.z),
+                to_mq_color(&l.color),
+            );
+        }
         _ => {}
     }
 }

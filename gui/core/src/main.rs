@@ -161,6 +161,9 @@ fn process_input(manager: &mut ModuleManager) -> InputState {
     if is_key_down(KeyCode::Right) {
         actions.push(InputAction::MoveRight);
     }
+    if is_mouse_button_pressed(MouseButton::Left) {
+        actions.push(InputAction::PrimaryAction);
+    }
 
     let (_, scroll_y) = mouse_wheel();
     if scroll_y > 0.0 {

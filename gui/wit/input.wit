@@ -19,7 +19,8 @@ interface input {
     move-up,
     move-down,
     move-forward,
-    move-backward
+    move-backward,
+    primary-action
   }
 
   record delta { x: f32, y: f32 }

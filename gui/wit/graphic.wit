@@ -16,6 +16,7 @@ interface graphic {
   record cube-cmd { position: vec3, size: vec3, color: color }
   record grid3d-cmd { slices: u32, spacing: f32, color1: color, color2: color }
   record camera-cmd { position: vec3, target: vec3, up: vec3, fovy: f32 }
+  record line3d-cmd { start: vec3, end: vec3, color: color }
 
   variant render-command {
     rect(rect-cmd),
@@ -23,5 +24,6 @@ interface graphic {
     cube(cube-cmd),
     grid3d(grid3d-cmd),
     camera(camera-cmd),
+    line3d(line3d-cmd),
   }
 }
