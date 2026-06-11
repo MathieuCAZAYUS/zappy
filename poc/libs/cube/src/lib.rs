@@ -3,13 +3,15 @@ wit_bindgen::generate!({
     world: "cube-world",
 });
 
-use std::{f32::consts::PI, sync::Mutex};
+use std::{f32::consts::PI, ops::Deref, sync::Mutex};
 
 use serde::{Deserialize, Serialize};
 
 use crate::local::zappy::{
     graphic::{Color, RectCmd, SpriteCmd},
     host_api::emit_event,
+    graphic::{Color, RectCmd},
+    host_api::{emit_event, host_get_state},
 };
 
 #[derive(Serialize, Deserialize, Default)]
@@ -141,10 +143,16 @@ impl Guest for Module {
         let data = CUBE_STATE.lock().unwrap();
         let center = data.offsets;
         let direction = if data.clockwise { 1.0 } else { -1.0 };
-        let base_speed = 25.0;
+        let base_speed = 10.0;
 
         let distance = 100.0;
-        let speed_mult = 0.5;
+        let speed_mult = if let Some(ts) = host_get_state("sys:timescale")
+            && ts.len() == 4
+        {
+            f32::from_le_bytes(ts[..4].try_into().unwrap())
+        } else {
+            1.0
+        };
 
         let size = (5.0, 25.0);
 

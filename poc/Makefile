@@ -4,13 +4,13 @@ RUST_MODULES = 	\
 	overlay
 
 ZIG_MODULES =	\
-	zig_mandel
+	time_manager
 
 C_MODULES =	\
 	reset_cube
 
 GO_MODULES =	\
-  go_mandel
+  bg_manager
 
 MODULES = $(RUST_MODULES) $(ZIG_MODULES) $(C_MODULES) $(GO_MODULES)
 

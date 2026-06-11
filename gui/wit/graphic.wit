@@ -1,0 +1,32 @@
+package local:zappy;
+
+interface graphic {
+  record color { r: u8, g: u8, b: u8, a: u8 }
+  record vec3 { x: f32, y: f32, z: f32 }
+
+  enum text-align {
+    left,
+    right,
+    center
+  }
+
+  record rect-cmd { x: f32, y: f32, w: f32, h: f32, color: color, rotation: f32 }
+  record text-cmd { text: string, x: f32, y: f32, size: f32, color: color, align: text-align }
+
+  record cube-cmd { position: vec3, size: vec3, color: color }
+  record grid3d-cmd { slices: u32, spacing: f32, color1: color, color2: color }
+  record camera-cmd { position: vec3, target: vec3, up: vec3, fovy: f32 }
+  record line3d-cmd { start: vec3, end: vec3, color: color }
+
+  record instanced-cubes-cmd { cubes: list<cube-cmd> }
+
+  variant render-command {
+    rect(rect-cmd),
+    text(text-cmd),
+    cube(cube-cmd),
+    grid3d(grid3d-cmd),
+    camera(camera-cmd),
+    line3d(line3d-cmd),
+    instanced-cubes(instanced-cubes-cmd),
+  }
+}

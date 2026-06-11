@@ -279,9 +279,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     );
 
                     if let Ok(mut s) = module.store.data().shared.lock() {
-                        s.cached_commands
-                            .retain(|(p_name, _, _, _)| p_name != &module.name);
-                        s.loaded_modules.retain(|m| m != &module.name);
+                        s.cleanup_module(&module.name);
                     }
 
                     false

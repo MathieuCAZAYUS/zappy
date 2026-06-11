@@ -37,8 +37,8 @@ world ui-world {
 world cube-world {
   import host-api;
 
-  use input.{engine-context, input-action, input-state};
-  use graphic.{render-command};
+  use input.{engine-context, input-action, delta, input-state};
+  use graphic.{render-command, text-align, instanced-cubes-cmd};
   use command.{command-desc, response-command};
 
   export handle-input: func(state: input-state);

@@ -1,0 +1,3 @@
+[workspace]
+members = ["core", "libs/console", "libs/crosshair", "libs/game_view", "libs/overlay"]
+resolver = "3"

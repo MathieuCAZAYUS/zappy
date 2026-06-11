@@ -1,0 +1,34 @@
+package local:zappy;
+
+interface input {
+  enum engine-context {
+    gameplay,
+    ui-console
+  }
+
+  enum input-action {
+    toggle-console,
+    navigate-up,
+    navigate-down,
+    scroll-up,
+    scroll-down,
+    confirm,
+    delete,
+    move-left,
+    move-right,
+    move-up,
+    move-down,
+    move-forward,
+    move-backward,
+    primary-action
+  }
+
+  record delta { x: f32, y: f32 }
+
+  record input-state {
+    context: engine-context,
+    actions: list<input-action>,
+    raw-chars: string,
+    mouse-delta: delta,
+  }
+}

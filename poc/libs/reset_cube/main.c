@@ -1,5 +1,11 @@
 #include "ui_world.h"
 
+bool initialized = false;
+float cube_x = 100.0f;
+float cube_y = 100.0f;
+float speed_x = 200.0f;
+float speed_y = 150.0f;
+
 #define HEAP_SIZE 65536
 static uint8_t g_heap[HEAP_SIZE];
 static unsigned long g_heap_idx = 0;
@@ -40,7 +46,7 @@ void *realloc(void *ptr, unsigned long new_size) {
 }
 
 void abort(void) {
-    while(1);
+  __builtin_trap();
 }
 
 unsigned long strlen(const char *s) {
@@ -57,6 +63,15 @@ int custom_strncmp(const uint8_t *s1, const char *s2, unsigned long n) {
     }
     if (n == 0) return 0;
     return *s1 - (uint8_t)*s2;
+}
+
+void init_module() {
+  if (initialized) return;
+  ui_world_string_t event_name;
+  ui_world_string_set(&event_name, "env:tick");
+
+  local_zappy_host_api_host_subscribe(&event_name);
+  initialized = true;
 }
 
 __attribute__((export_name("ui-world#init")))
@@ -126,9 +141,38 @@ void exports_ui_world_handle_input(ui_world_input_state_t *state) {
 
 __attribute__((export_name("ui-world#update-module")))
 void exports_ui_world_update_module(float time, float dt, float w, float h, ui_world_list_render_command_t *ret) {
-    (void)time; (void)dt; (void)w; (void)h;
-    ret->ptr = (void*)0;
-    ret->len = 0;
+  g_heap_idx = 0;
+  init_module();
+
+  ui_world_string_t key_timescale;
+  ui_world_string_set(&key_timescale, "sys:timescale");
+
+  ui_world_list_u8_t ts_val;
+  bool is_some = local_zappy_host_api_host_get_state(&key_timescale, &ts_val);
+
+  float current_time_scale = 1.0f;
+
+  if (is_some && ts_val.len == sizeof(float)) {
+    memcpy(&current_time_scale, ts_val.ptr, sizeof(float));
+    ui_world_list_u8_free(&ts_val);
+  }
+
+  cube_x += speed_x * dt * current_time_scale;
+  cube_y += speed_x * dt * current_time_scale;
+
+  bool bounced = false;
+  if (cube_x <= 0 || cube_x >= w - 50) { speed_x *= -1; bounced = true; }
+  if (cube_y <= 0 || cube_y >= h - 50) { speed_y *= -1; bounced = true; }
+
+  if (bounced) {
+    ui_world_string_t ev_name, ev_payload;
+    ui_world_string_set(&ev_name, "cube:bounced");
+    ui_world_string_set(&ev_payload, "");
+    local_zappy_host_api_emit_event(&ev_name, &ev_payload);
+  }
+
+  ret->ptr = NULL;
+  ret->len = 0;
 }
 
 __attribute__((export_name("ui-world#accept-log")))
