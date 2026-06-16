@@ -135,8 +135,6 @@ const METRIC_EVENT_NAME: &str = "overlay:update_metric";
 
 const MAX_DT: f32 = 50.0;
 
-const CHUNK_SIZE: usize = 25;
-
 struct Chunk {
     center: Vec3,
     bounding_radius: f32,
@@ -223,7 +221,9 @@ static CUBES: Mutex<Vec<CubeEntity>> = Mutex::new(Vec::new());
 static _INITIALIZED: Mutex<bool> = Mutex::new(false);
 static GRAB_STATE: Mutex<Option<(usize, usize, f32)>> = Mutex::new(None);
 
-static MAP_DIMENSIONS: (u32, u32) = (10000, 10000);
+static MAP_DIMENSIONS: (u32, u32) = (12, 12);
+
+const CHUNK_SIZE: usize = 2;
 
 struct Plane {
     normal: Vec3,
@@ -502,36 +502,6 @@ fn apply_camera_physics(camera: &mut CameraState, dt: f32) {
     camera.position.z += camera.velocity.z * dt;
 }
 
-/*
-fn apply_cube_physics(
-    cubes: &mut [CubeEntity],
-    grab_state: Option<(usize, f32)>,
-    camera_pos: &Vec3,
-    ray_dir: &Vec3,
-    dt: f32,
-) {
-    if let Some((idx, dist)) = grab_state
-        && let Some(cube) = cubes.get_mut(idx)
-    {
-        cube.target_pos = Vec3 {
-            x: camera_pos.x + ray_dir.x * dist,
-            y: camera_pos.y + ray_dir.y * dist,
-            z: camera_pos.z + ray_dir.z * dist,
-        };
-    }
-    for cube in cubes.iter_mut() {
-        cube.vel.x += (cube.target_pos.x - cube.pos.x) * SPRING_STIFFNESS * dt;
-        cube.vel.y += (cube.target_pos.y - cube.pos.y) * SPRING_STIFFNESS * dt;
-        cube.vel.z += (cube.target_pos.z - cube.pos.z) * SPRING_STIFFNESS * dt;
-        cube.vel.x -= cube.vel.x * DAMPING * dt;
-        cube.vel.y -= cube.vel.y * DAMPING * dt;
-        cube.vel.z -= cube.vel.z * DAMPING * dt;
-        cube.pos.x += cube.vel.x * dt;
-        cube.pos.y += cube.vel.y * dt;
-        cube.pos.z += cube.vel.z * dt;
-    }
-}
-*/
 fn render_camera_and_grid(camera: &CameraState, ray_dir: &Vec3, cmds: &mut Vec<RenderCommand>) {
     let target = Vec3 {
         x: camera.position.x + ray_dir.x,
@@ -927,8 +897,8 @@ impl Guest for Module {
         let mut chunks = CHUNKS.lock().unwrap();
         let dt = dt.min(MAX_DT);
 
-        let chunks_x = MAP_DIMENSIONS.0 as usize / CHUNK_SIZE;
-        let chunks_z = MAP_DIMENSIONS.1 as usize / CHUNK_SIZE;
+        let chunks_x = MAP_DIMENSIONS.0 as usize / CHUNK_SIZE.min(MAP_DIMENSIONS.0 as usize);
+        let chunks_z = MAP_DIMENSIONS.1 as usize / CHUNK_SIZE.min(MAP_DIMENSIONS.1 as usize);
 
         let cam_cx = (((camera.position.x + (MAP_DIMENSIONS.0 as f32 / 2.0)) / CHUNK_SIZE as f32)
             .floor() as i32)
