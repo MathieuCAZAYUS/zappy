@@ -37,6 +37,10 @@ const MIN_HEIGHT: usize = 1;
 const MIN_CLIENTS_NB: usize = 1;
 const MIN_FREQUENCY: usize = 1;
 
+const LINE_DELIMITER: char = '\n';
+const CARRIAGE_RETURN: char = '\r';
+const EMPTY_LINE: &str = "";
+
 #[derive(Debug)]
 struct Config {
     port: u16,
@@ -49,6 +53,7 @@ struct Config {
 
 struct Client {
     socket: TcpStream,
+    input_buffer: String,
 }
 
 fn main() -> io::Result<()> {
@@ -245,7 +250,13 @@ fn accept_new_clients(
                     continue;
                 }
 
-                clients.insert(token, Client { socket });
+                clients.insert(
+                    token,
+                    Client {
+                        socket,
+                        input_buffer: String::new(),
+                    },
+                );
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                 break;
@@ -270,8 +281,8 @@ fn read_from_client(token: Token, clients: &mut HashMap<Token, Client>) {
                 should_disconnect = true;
             }
             Ok(size) => {
-                let text = String::from_utf8_lossy(&buffer[..size]);
-                print!("Received: {}", text);
+                append_to_client_buffer(client, &buffer, size);
+                handle_complete_client_lines(client);
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
             Err(error) => {
@@ -284,4 +295,31 @@ fn read_from_client(token: Token, clients: &mut HashMap<Token, Client>) {
     if should_disconnect {
         clients.remove(&token);
     }
+}
+
+fn append_to_client_buffer(client: &mut Client, buffer: &[u8], size: usize) {
+    let received_text = String::from_utf8_lossy(&buffer[..size]);
+    client.input_buffer.push_str(&received_text);
+}
+
+fn handle_complete_client_lines(client: &mut Client) {
+    while let Some(line_end_index) = client.input_buffer.find(LINE_DELIMITER) {
+        let line = extract_client_line(client, line_end_index);
+
+        if line != EMPTY_LINE {
+            println!("Received line: {}", line);
+        }
+    }
+}
+
+fn extract_client_line(client: &mut Client, line_end_index: usize) -> String {
+    let mut line = client.input_buffer[..line_end_index].to_string();
+
+    client.input_buffer.drain(..=line_end_index);
+
+    if line.ends_with(CARRIAGE_RETURN) {
+        line.pop();
+    }
+
+    line
 }
