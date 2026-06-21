@@ -30,4 +30,8 @@ impl Team {
         self.used_slots += 1;
         true
     }
+
+    pub fn release_slot(&mut self) {
+        self.used_slots = self.used_slots.saturating_sub(1);
+    }
 }

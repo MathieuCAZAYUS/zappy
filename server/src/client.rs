@@ -1,3 +1,4 @@
+use crate::command::CommandQueue;
 use mio::net::TcpStream;
 
 #[derive(Debug, PartialEq)]
@@ -13,4 +14,5 @@ pub struct Client {
     pub state: ClientState,
     pub team_name: Option<String>,
     pub player_id: Option<usize>,
+    pub command_queue: CommandQueue,
 }

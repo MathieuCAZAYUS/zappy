@@ -1,9 +1,12 @@
 use crate::client::{Client, ClientState};
+use crate::command::QueuedCommand;
 use crate::config::Config;
+use crate::constants::MAX_PENDING_COMMANDS;
 use crate::constants::{
-    CARRIAGE_RETURN, EMPTY_LINE, GRAPHIC_TEAM_NAME, INITIAL_PLAYER_X, INITIAL_PLAYER_Y,
-    KO_RESPONSE, LINE_DELIMITER, PLAYER_ID_INCREMENT, RESPONSE_END, RESPONSE_SEPARATOR,
+    CARRIAGE_RETURN, EMPTY_LINE, GRAPHIC_TEAM_NAME, KO_RESPONSE, LINE_DELIMITER,
+    PLAYER_ID_INCREMENT, RESPONSE_END, RESPONSE_SEPARATOR,
 };
+use crate::egg::{count_team_eggs, take_random_team_egg, Egg};
 use crate::player::{Orientation, Player};
 use crate::team::Team;
 use std::io::Write;
@@ -14,6 +17,7 @@ pub fn handle_complete_client_lines(
     teams: &mut [Team],
     players: &mut Vec<Player>,
     next_player_id: &mut usize,
+    eggs: &mut Vec<Egg>,
 ) {
     while let Some(line_end_index) = client.input_buffer.find(LINE_DELIMITER) {
         let line = extract_client_line(client, line_end_index);
@@ -22,7 +26,7 @@ pub fn handle_complete_client_lines(
             continue;
         }
 
-        handle_client_line(client, &line, config, teams, players, next_player_id);
+        handle_client_line(client, &line, config, teams, players, next_player_id, eggs);
     }
 }
 
@@ -45,16 +49,14 @@ fn handle_client_line(
     teams: &mut [Team],
     players: &mut Vec<Player>,
     next_player_id: &mut usize,
+    eggs: &mut Vec<Egg>,
 ) {
     match client.state {
         ClientState::WaitingTeamName => {
-            handle_handshake_line(client, line, config, teams, players, next_player_id);
+            handle_handshake_line(client, line, config, teams, players, next_player_id, eggs);
         }
         ClientState::Ai => {
-            println!(
-                "AI command from player {:?} / team {:?}: {}",
-                client.player_id, client.team_name, line
-            );
+            queue_ai_command(client, line);
         }
         ClientState::Gui => {
             println!("GUI command: {}", line);
@@ -69,6 +71,7 @@ fn handle_handshake_line(
     teams: &mut [Team],
     players: &mut Vec<Player>,
     next_player_id: &mut usize,
+    eggs: &mut Vec<Egg>,
 ) {
     if line == GRAPHIC_TEAM_NAME {
         authenticate_gui_client(client);
@@ -76,11 +79,11 @@ fn handle_handshake_line(
     }
 
     if let Some(team) = find_team_mut(teams, line) {
-        authenticate_ai_client(client, team, config, players, next_player_id);
+        authenticate_ai_client(client, team, config, players, next_player_id, eggs);
         return;
     }
 
-    reject_unknown_team(client, line);
+    reject_connection(client, line);
 }
 
 fn authenticate_gui_client(client: &mut Client) {
@@ -101,11 +104,18 @@ fn authenticate_ai_client(
     config: &Config,
     players: &mut Vec<Player>,
     next_player_id: &mut usize,
+    eggs: &mut Vec<Egg>,
 ) {
     if !team.reserve_slot() {
-        reject_unknown_team(client, &team.name);
+        reject_connection(client, &team.name);
         return;
     }
+
+    let Some(egg) = take_random_team_egg(eggs, &team.name) else {
+        team.release_slot();
+        reject_connection(client, &team.name);
+        return;
+    };
 
     let player_id = *next_player_id;
     *next_player_id += PLAYER_ID_INCREMENT;
@@ -113,9 +123,16 @@ fn authenticate_ai_client(
     let player = Player::new(
         player_id,
         team.name.clone(),
-        INITIAL_PLAYER_X,
-        INITIAL_PLAYER_Y,
-        Orientation::North,
+        egg.x,
+        egg.y,
+        Orientation::random(),
+    );
+
+    println!("Egg {} hatched for team {}", egg.id, team.name);
+
+    println!(
+        "Player {} spawned at ({}, {}) facing {:?}",
+        player.id, player.x, player.y, player.orientation
     );
 
     players.push(player);
@@ -124,14 +141,11 @@ fn authenticate_ai_client(
     client.team_name = Some(team.name.clone());
     client.player_id = Some(player_id);
 
+    let available_eggs = count_team_eggs(eggs, &team.name);
+
     let response = format!(
         "{}{}{}{}{}{}",
-        team.available_slots(),
-        RESPONSE_END,
-        config.width,
-        RESPONSE_SEPARATOR,
-        config.height,
-        RESPONSE_END
+        available_eggs, RESPONSE_END, config.width, RESPONSE_SEPARATOR, config.height, RESPONSE_END
     );
 
     if let Err(error) = client.socket.write_all(response.as_bytes()) {
@@ -144,10 +158,27 @@ fn authenticate_ai_client(
     );
 }
 
-fn reject_unknown_team(client: &mut Client, team_name: &str) {
-    eprintln!("Unknown team name or no available slots: {}", team_name);
+fn reject_connection(client: &mut Client, team_name: &str) {
+    eprintln!("Unknown team or no available egg: {}", team_name);
 
     if let Err(error) = client.socket.write_all(KO_RESPONSE) {
         eprintln!("Failed to send rejection response: {}", error);
     }
+}
+
+fn queue_ai_command(client: &mut Client, line: &str) {
+    let command = QueuedCommand::new(line.to_string());
+
+    if !client.command_queue.push(command, MAX_PENDING_COMMANDS) {
+        println!("Command queue full for player {:?}", client.player_id);
+        return;
+    }
+
+    println!(
+        "Queued command for player {:?}: {} ({}/{})",
+        client.player_id,
+        line,
+        client.command_queue.len(),
+        MAX_PENDING_COMMANDS
+    );
 }

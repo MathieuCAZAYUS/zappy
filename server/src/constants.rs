@@ -6,6 +6,12 @@ pub const SERVER_TOKEN: Token = Token(SERVER_TOKEN_ID);
 pub const FIRST_CLIENT_TOKEN_ID: usize = 1;
 pub const TOKEN_INCREMENT: usize = 1;
 
+pub const FIRST_PLAYER_ID: usize = 1;
+pub const PLAYER_ID_INCREMENT: usize = 1;
+
+pub const FIRST_EGG_ID: usize = 1;
+pub const EGG_ID_INCREMENT: usize = 1;
+
 pub const EVENTS_CAPACITY: usize = 128;
 pub const READ_BUFFER_SIZE: usize = 512;
 
@@ -41,14 +47,16 @@ pub const GRAPHIC_TEAM_NAME: &str = "GRAPHIC";
 pub const RESPONSE_SEPARATOR: &str = " ";
 pub const RESPONSE_END: &str = "\n";
 
-pub const FIRST_PLAYER_ID: usize = 1;
-pub const PLAYER_ID_INCREMENT: usize = 1;
-
 pub const INITIAL_PLAYER_LEVEL: usize = 1;
-pub const INITIAL_PLAYER_X: usize = 0;
-pub const INITIAL_PLAYER_Y: usize = 0;
+
+pub const ORIENTATION_COUNT: usize = 4;
+pub const ORIENTATION_NORTH_INDEX: usize = 0;
+pub const ORIENTATION_EAST_INDEX: usize = 1;
+pub const ORIENTATION_SOUTH_INDEX: usize = 2;
+pub const ORIENTATION_WEST_INDEX: usize = 3;
 
 pub const EMPTY_RESOURCE_COUNT: usize = 0;
+pub const RESOURCE_INCREMENT: usize = 1;
 
 pub const RESOURCE_DENSITY_FOOD: f64 = 0.5;
 pub const RESOURCE_DENSITY_LINEMATE: f64 = 0.3;
@@ -59,4 +67,5 @@ pub const RESOURCE_DENSITY_PHIRAS: f64 = 0.08;
 pub const RESOURCE_DENSITY_THYSTAME: f64 = 0.05;
 
 pub const MINIMUM_RESOURCE_QUANTITY: usize = 1;
-pub const RESOURCE_INCREMENT: usize = 1;
+
+pub const MAX_PENDING_COMMANDS: usize = 10;

@@ -1,6 +1,8 @@
 mod client;
+mod command;
 mod config;
 mod constants;
+mod egg;
 mod map;
 mod network;
 mod player;
@@ -11,8 +13,10 @@ mod team;
 use crate::client::Client;
 use crate::config::{parse_args, Config};
 use crate::constants::{
-    ERROR_EXIT, EVENTS_CAPACITY, FIRST_CLIENT_TOKEN_ID, FIRST_PLAYER_ID, SERVER_TOKEN, USAGE,
+    ERROR_EXIT, EVENTS_CAPACITY, FIRST_CLIENT_TOKEN_ID, FIRST_EGG_ID, FIRST_PLAYER_ID,
+    SERVER_TOKEN, USAGE,
 };
+use crate::egg::{create_initial_eggs, Egg};
 use crate::map::GameMap;
 use crate::network::{accept_new_clients, create_listener, read_from_client};
 use crate::player::Player;
@@ -47,6 +51,20 @@ fn main() -> io::Result<()> {
 
     print_resource_totals(&game_map);
 
+    let mut teams = create_teams(&config);
+
+    let mut next_egg_id = FIRST_EGG_ID;
+
+    let mut eggs: Vec<Egg> = create_initial_eggs(
+        &teams,
+        config.clients_nb,
+        config.width,
+        config.height,
+        &mut next_egg_id,
+    );
+
+    println!("Created {} initial eggs", eggs.len());
+
     let mut poll = Poll::new()?;
     let mut events = Events::with_capacity(EVENTS_CAPACITY);
     let mut listener = create_listener(config.port)?;
@@ -56,8 +74,6 @@ fn main() -> io::Result<()> {
 
     let mut clients: HashMap<Token, Client> = HashMap::new();
     let mut next_token_id = FIRST_CLIENT_TOKEN_ID;
-
-    let mut teams = create_teams(&config);
 
     let mut players: Vec<Player> = Vec::new();
     let mut next_player_id = FIRST_PLAYER_ID;
@@ -80,6 +96,7 @@ fn main() -> io::Result<()> {
                         &mut teams,
                         &mut players,
                         &mut next_player_id,
+                        &mut eggs,
                     );
                 }
             }

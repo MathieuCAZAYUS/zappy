@@ -1,6 +1,8 @@
 use crate::client::{Client, ClientState};
+use crate::command::CommandQueue;
 use crate::config::Config;
 use crate::constants::{DEFAULT_BIND_ADDRESS, READ_BUFFER_SIZE, TOKEN_INCREMENT, WELCOME_MESSAGE};
+use crate::egg::Egg;
 use crate::player::Player;
 use crate::protocol::handle_complete_client_lines;
 use crate::team::Team;
@@ -56,6 +58,7 @@ pub fn accept_new_clients(
                         state: ClientState::WaitingTeamName,
                         team_name: None,
                         player_id: None,
+                        command_queue: CommandQueue::new(),
                     },
                 );
             }
@@ -77,6 +80,7 @@ pub fn read_from_client(
     teams: &mut [Team],
     players: &mut Vec<Player>,
     next_player_id: &mut usize,
+    eggs: &mut Vec<Egg>,
 ) {
     let mut should_disconnect = false;
 
@@ -90,7 +94,8 @@ pub fn read_from_client(
             }
             Ok(size) => {
                 append_to_client_buffer(client, &buffer, size);
-                handle_complete_client_lines(client, config, teams, players, next_player_id);
+
+                handle_complete_client_lines(client, config, teams, players, next_player_id, eggs);
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
             Err(error) => {
@@ -107,5 +112,6 @@ pub fn read_from_client(
 
 fn append_to_client_buffer(client: &mut Client, buffer: &[u8], size: usize) {
     let received_text = String::from_utf8_lossy(&buffer[..size]);
+
     client.input_buffer.push_str(&received_text);
 }
