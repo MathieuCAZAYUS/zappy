@@ -1,4 +1,4 @@
-use crate::constants::EMPTY_RESOURCE_COUNT;
+use crate::constants::{EMPTY_RESOURCE_COUNT, RESOURCE_INCREMENT};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Resource {
@@ -49,13 +49,13 @@ impl Tile {
 
     pub fn add_resource(&mut self, resource: Resource) {
         match resource {
-            Resource::Food => self.food += 1,
-            Resource::Linemate => self.linemate += 1,
-            Resource::Deraumere => self.deraumere += 1,
-            Resource::Sibur => self.sibur += 1,
-            Resource::Mendiane => self.mendiane += 1,
-            Resource::Phiras => self.phiras += 1,
-            Resource::Thystame => self.thystame += 1,
+            Resource::Food => self.food += RESOURCE_INCREMENT,
+            Resource::Linemate => self.linemate += RESOURCE_INCREMENT,
+            Resource::Deraumere => self.deraumere += RESOURCE_INCREMENT,
+            Resource::Sibur => self.sibur += RESOURCE_INCREMENT,
+            Resource::Mendiane => self.mendiane += RESOURCE_INCREMENT,
+            Resource::Phiras => self.phiras += RESOURCE_INCREMENT,
+            Resource::Thystame => self.thystame += RESOURCE_INCREMENT,
         }
     }
 
@@ -74,7 +74,7 @@ impl Tile {
             return false;
         }
 
-        *resource_count -= 1;
+        *resource_count -= RESOURCE_INCREMENT;
         true
     }
 }
@@ -103,11 +103,21 @@ impl GameMap {
 
     pub fn get_tile(&self, x: usize, y: usize) -> Option<&Tile> {
         let index = self.index(x, y)?;
+
         self.tiles.get(index)
     }
 
     pub fn get_tile_mut(&mut self, x: usize, y: usize) -> Option<&mut Tile> {
         let index = self.index(x, y)?;
+
+        self.tiles.get_mut(index)
+    }
+
+    pub fn get_tile_by_index(&self, index: usize) -> Option<&Tile> {
+        self.tiles.get(index)
+    }
+
+    pub fn get_tile_by_index_mut(&mut self, index: usize) -> Option<&mut Tile> {
         self.tiles.get_mut(index)
     }
 
@@ -147,7 +157,7 @@ impl GameMap {
 #[cfg(test)]
 mod tests {
     use super::{GameMap, Resource};
-    use crate::constants::EMPTY_RESOURCE_COUNT;
+    use crate::constants::{EMPTY_RESOURCE_COUNT, RESOURCE_INCREMENT};
 
     const TEST_MAP_WIDTH: usize = 10;
     const TEST_MAP_HEIGHT: usize = 5;
@@ -164,6 +174,7 @@ mod tests {
     #[test]
     fn new_tile_contains_no_resources() {
         let map = GameMap::new(TEST_MAP_WIDTH, TEST_MAP_HEIGHT);
+
         let tile = map
             .get_tile(FIRST_TILE_POSITION, FIRST_TILE_POSITION)
             .expect("first tile should exist");
@@ -174,21 +185,54 @@ mod tests {
     #[test]
     fn adds_and_removes_resource() {
         let mut map = GameMap::new(TEST_MAP_WIDTH, TEST_MAP_HEIGHT);
+
         let tile = map
             .get_tile_mut(FIRST_TILE_POSITION, FIRST_TILE_POSITION)
             .expect("first tile should exist");
 
         tile.add_resource(Resource::Food);
 
-        assert_eq!(tile.resource_count(Resource::Food), 1);
+        assert_eq!(tile.resource_count(Resource::Food), RESOURCE_INCREMENT);
+
         assert!(tile.remove_resource(Resource::Food));
+
         assert_eq!(tile.resource_count(Resource::Food), EMPTY_RESOURCE_COUNT);
+    }
+
+    #[test]
+    fn cannot_remove_missing_resource() {
+        let mut map = GameMap::new(TEST_MAP_WIDTH, TEST_MAP_HEIGHT);
+
+        let tile = map
+            .get_tile_mut(FIRST_TILE_POSITION, FIRST_TILE_POSITION)
+            .expect("first tile should exist");
+
+        assert!(!tile.remove_resource(Resource::Food));
+    }
+
+    #[test]
+    fn returns_none_for_invalid_coordinates() {
+        let map = GameMap::new(TEST_MAP_WIDTH, TEST_MAP_HEIGHT);
+
+        assert!(map.get_tile(TEST_MAP_WIDTH, FIRST_TILE_POSITION).is_none());
+
+        assert!(map.get_tile(FIRST_TILE_POSITION, TEST_MAP_HEIGHT).is_none());
     }
 
     #[test]
     fn wraps_negative_x_position() {
         let map = GameMap::new(TEST_MAP_WIDTH, TEST_MAP_HEIGHT);
 
-        assert_eq!(map.wrap_x(OUTSIDE_LEFT_POSITION), TEST_MAP_WIDTH - 1);
+        assert_eq!(
+            map.wrap_x(OUTSIDE_LEFT_POSITION),
+            TEST_MAP_WIDTH - RESOURCE_INCREMENT
+        );
+    }
+
+    #[test]
+    fn wraps_position_after_right_edge() {
+        let map = GameMap::new(TEST_MAP_WIDTH, TEST_MAP_HEIGHT);
+
+        assert_eq!(map.wrap_x(TEST_MAP_WIDTH as isize), FIRST_TILE_POSITION);
     }
 }

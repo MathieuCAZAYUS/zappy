@@ -49,3 +49,14 @@ pub const INITIAL_PLAYER_X: usize = 0;
 pub const INITIAL_PLAYER_Y: usize = 0;
 
 pub const EMPTY_RESOURCE_COUNT: usize = 0;
+
+pub const RESOURCE_DENSITY_FOOD: f64 = 0.5;
+pub const RESOURCE_DENSITY_LINEMATE: f64 = 0.3;
+pub const RESOURCE_DENSITY_DERAUMERE: f64 = 0.15;
+pub const RESOURCE_DENSITY_SIBUR: f64 = 0.1;
+pub const RESOURCE_DENSITY_MENDIANE: f64 = 0.1;
+pub const RESOURCE_DENSITY_PHIRAS: f64 = 0.08;
+pub const RESOURCE_DENSITY_THYSTAME: f64 = 0.05;
+
+pub const MINIMUM_RESOURCE_QUANTITY: usize = 1;
+pub const RESOURCE_INCREMENT: usize = 1;

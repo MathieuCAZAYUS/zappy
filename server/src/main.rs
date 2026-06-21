@@ -5,6 +5,7 @@ mod map;
 mod network;
 mod player;
 mod protocol;
+mod resources;
 mod team;
 
 use crate::client::Client;
@@ -15,6 +16,7 @@ use crate::constants::{
 use crate::map::GameMap;
 use crate::network::{accept_new_clients, create_listener, read_from_client};
 use crate::player::Player;
+use crate::resources::{print_resource_totals, spawn_initial_resources};
 use crate::team::Team;
 use mio::{Events, Interest, Poll, Token};
 use std::collections::HashMap;
@@ -32,7 +34,9 @@ fn main() -> io::Result<()> {
 
     println!("Starting server with config: {:?}", config);
 
-    let game_map = GameMap::new(config.width, config.height);
+    let mut game_map = GameMap::new(config.width, config.height);
+
+    spawn_initial_resources(&mut game_map);
 
     println!(
         "Created map: {}x{} with {} tiles",
@@ -40,6 +44,8 @@ fn main() -> io::Result<()> {
         game_map.height,
         game_map.tile_count()
     );
+
+    print_resource_totals(&game_map);
 
     let mut poll = Poll::new()?;
     let mut events = Events::with_capacity(EVENTS_CAPACITY);
@@ -50,7 +56,9 @@ fn main() -> io::Result<()> {
 
     let mut clients: HashMap<Token, Client> = HashMap::new();
     let mut next_token_id = FIRST_CLIENT_TOKEN_ID;
+
     let mut teams = create_teams(&config);
+
     let mut players: Vec<Player> = Vec::new();
     let mut next_player_id = FIRST_PLAYER_ID;
 
