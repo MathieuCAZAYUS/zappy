@@ -3,7 +3,8 @@ RUST_MODULES = 	\
 	crosshair	\
 	game_view	\
 	obj_viewer \
-	overlay
+	overlay	\
+	zappy_net
 
 MODULES = $(RUST_MODULES)
 

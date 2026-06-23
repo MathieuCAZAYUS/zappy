@@ -10,6 +10,9 @@ use macroquad::prelude::{Color as MQColor, *};
 use manager::ModuleManager;
 use module::ResponseCommand;
 use wasmtime::{Config, Engine};
+use std::io::{BufRead, BufReader, Write};
+use std::net::TcpStream;
+use std::sync::{Arc, Mutex};
 
 use crate::{model_loader::TextureRegistry, module::RenderCommand};
 
@@ -216,9 +219,96 @@ fn load_models(manager: &mut ModuleManager) -> bool {
     true
 }
 
+fn start_network_thread(
+    host: String,
+    port: u16,
+    shared: Arc<Mutex<manager::SharedEngineState>>,
+) {
+    std::thread::spawn(move || {
+        let addr = format!("{}:{}", host, port);
+
+        let stream = match TcpStream::connect(&addr) {
+            Ok(s) => {
+                println!("[NET] Connecté au serveur {}", addr);
+                s
+            }
+            Err(e) => {
+                println!("[NET] Impossible de se connecter à {} : {}", addr, e);
+                return;
+            }
+        };
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut writer = stream;
+
+        let mut welcome = String::new();
+        if reader.read_line(&mut welcome).is_err() || !welcome.contains("WELCOME") {
+            println!("[NET] Handshake échoué, réponse reçue : {:?}", welcome);
+            return;
+        }
+        println!("[NET] Handshake OK : {:?}", welcome.trim());
+
+        if let Err(e) = writer.write_all(b"GRAPHIC\n") {
+            println!("[NET] Erreur envoi GRAPHIC : {}", e);
+            return;
+        }
+        if let Err(e) = writer.write_all(b"mct\n") {
+            println!("[NET] Erreur envoi mct : {}", e);
+            return;
+        }
+        println!("[NET] mct envoyé → attente du contenu de la map...");
+        let mut line = String::new();
+        loop {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) => {
+                    println!("[NET] Connexion fermée par le serveur.");
+                    break;
+                }
+                Ok(_) => {
+                    let trimmed = line.trim().to_string();
+                    if trimmed.is_empty() {
+                        continue;
+                    }
+                    println!("[NET] Reçu : {}", trimmed);
+                    if let Ok(mut s) = shared.lock() {
+                        s.event_queue.push(("server:line".to_string(), trimmed));
+                    }
+                }
+                Err(e) => {
+                    println!("[NET] Erreur lecture : {}", e);
+                    break;
+                }
+            }
+        }
+    });
+}
+
 #[macroquad::main("Zappy")]
 async fn main() -> Result<(), anyhow::Error> {
     colored::control::set_override(true);
+
+    let args: Vec<String> = std::env::args().collect();
+    let mut port: u16 = 4242;
+    let mut host = String::from("localhost");
+
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-p" => {
+                if let Some(v) = args.get(i + 1) {
+                    port = v.parse().expect("Port invalide");
+                    i += 2;
+                }
+            }
+            "-h" => {
+                if let Some(v) = args.get(i + 1) {
+                    host = v.clone();
+                    i += 2;
+                }
+            }
+            _ => { i += 1; }
+        }
+    }
 
     let mut config = Config::new();
     config.wasm_component_model(true);
@@ -226,6 +316,8 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut manager = ModuleManager::new(Engine::new(&config)?);
     manager.scan_and_load_all();
     let (reload_rx, _watcher) = watcher::setup()?;
+
+    start_network_thread(host, port, manager.shared.clone());
 
     let mut tex_reg = TextureRegistry::new();
     let models = model_loader::discover_models(&mut tex_reg);

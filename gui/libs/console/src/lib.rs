@@ -241,7 +241,8 @@ impl Guest for Module {
                     console.history_index = Some(idx);
                     console.input = console.history[idx].clone();
                 }
-                InputAction::NavigateDown if let Some(idx) = console.history_index => {
+                InputAction::NavigateDown if console.history_index.is_some() => {
+                    let idx = console.history_index.unwrap();
                     if idx + 1 < console.history.len() {
                         console.history_index = Some(idx + 1);
                         console.input = console.history[idx + 1].clone();

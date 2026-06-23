@@ -6,5 +6,6 @@ members = [
   "libs/game_view",
   "libs/obj_viewer",
   "libs/overlay",
+  "libs/zappy_net",
 ]
 resolver = "3"
