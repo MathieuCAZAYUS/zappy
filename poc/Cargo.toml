@@ -1,3 +1,0 @@
-[workspace]
-members = ["core", "libs/cube", "libs/console", "libs/overlay"]
-resolver = "3"

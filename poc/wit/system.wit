@@ -1,6 +1,0 @@
-package local:zappy;
-
-interface system {
-  use graphic.{color};
-  record text-segment { text: string, color: color }
-}

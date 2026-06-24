@@ -1,6 +1,0 @@
-package local:zappy;
-
-interface command {
-  variant response-command { ok, bad-argument, unknown }
-  record command-desc { module: string, name: string, options: string, help: string }
-}
