@@ -286,10 +286,10 @@ pub fn action_to_command(action: usize) -> &'static str {
         16 => "Set mendiane",
         17 => "Set phiras",
         18 => "Set thystame",
-        19 => "Eat",
+        19 => "Forward",
         20 => "Fork",
-        21 => "Broadcast adv",
-        22 => "Broadcast inv",
+        21 => "Forward",
+        22 => "Forward",
         _ => "Forward",
     }
 }
@@ -666,10 +666,10 @@ fn test_action_set_thystame() {
 
 #[test]
 fn test_action_eat_and_fork() {
-    assert_eq!(action_to_command(19), "Eat");
+    assert_eq!(action_to_command(19), "Forward");
     assert_eq!(action_to_command(20), "Fork");
-    assert_eq!(action_to_command(21), "Broadcast adv");
-    assert_eq!(action_to_command(22), "Broadcast inv");
+    assert_eq!(action_to_command(21), "Forward");
+    assert_eq!(action_to_command(22), "Forward");
 }
 
 #[test]

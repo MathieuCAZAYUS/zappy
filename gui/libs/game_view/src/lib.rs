@@ -6,11 +6,12 @@ wit_bindgen::generate!({
 use serde::{Deserialize, Serialize};
 
 use crate::local::zappy::{
-    graphic::{CameraCmd, Color, CubeCmd, Grid3dCmd, Line3dCmd, Vec3},
+    graphic::{CameraCmd, Color, CubeCmd, Grid3dCmd, Line3dCmd, Mesh3dCmd, Vec2, Vec3, Vertex},
     host_api::emit_event,
 };
 use std::{
     collections::HashMap,
+    f32::consts::{FRAC_PI_2, PI},
     sync::{LazyLock, Mutex},
 };
 
@@ -74,8 +75,23 @@ const MAX_CAMERA_SPEED: f32 = 10.0;
 const SPHERE_INTERSECT_RADIUS: f32 = 0.25;
 const MAX_WISH_DIR_LEN: f32 = 1.0;
 const MAX_CUBES_PER_RESOURCE: u32 = 5;
-const CUBE_HIGHT: f32 = 0.5;
-const PLAYER_CUBE_SIZE: f32 = 0.4;
+const GOLEM_OBJ: &str = include_str!("../../../assets/models/giant/model.obj");
+const GOLEM_SCALE: f32 = 0.08;
+const GOLEM_Y_OFFSET: f32 = 0.02;
+const GOLEM_COLOR: Color = Color {
+    r: 122,
+    g: 128,
+    b: 122,
+    a: 255,
+};
+const GOLEM_EYE_COLOR: Color = Color {
+    r: 235,
+    g: 245,
+    b: 255,
+    a: 255,
+};
+const GOLEM_MAX_VERTICES: usize = u8::MAX as usize;
+const GOLEM_MAX_INDICES: usize = u8::MAX as usize;
 
 const CAMERA_FOVY: f32 = 70.0;
 const GRID_SPACING: f32 = 0.5;
@@ -151,17 +167,22 @@ struct Chunk {
 static CHUNKS: LazyLock<Mutex<HashMap<usize, Chunk>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-fn get_or_create_chunk(chunks: &mut HashMap<usize, Chunk>, cx: usize, cz: usize, chunks_z: usize, map_w: u32, map_h: u32) {
+fn get_or_create_chunk(
+    chunks: &mut HashMap<usize, Chunk>,
+    cx: usize,
+    cz: usize,
+    chunks_z: usize,
+    map_w: u32,
+    map_h: u32,
+) {
     let global_id = cx * chunks_z + cz;
 
     chunks.entry(global_id).or_insert_with(|| {
         let chunk_half_width = (CHUNK_SIZE as f32) * 0.5;
         let chunk_bounding_radius = (chunk_half_width * chunk_half_width * 2.0).sqrt() + 1.0;
 
-        let chunk_world_x =
-            (cx * CHUNK_SIZE) as f32 - (map_w as f32 / 2.0) + chunk_half_width;
-        let chunk_world_z =
-            (cz * CHUNK_SIZE) as f32 - (map_h as f32 / 2.0) + chunk_half_width;
+        let chunk_world_x = (cx * CHUNK_SIZE) as f32 - (map_w as f32 / 2.0) + chunk_half_width;
+        let chunk_world_z = (cz * CHUNK_SIZE) as f32 - (map_h as f32 / 2.0) + chunk_half_width;
 
         let mut chunk = Chunk {
             center: Vec3 {
@@ -197,7 +218,11 @@ fn get_or_create_chunk(chunks: &mut HashMap<usize, Chunk>, cx: usize, cz: usize,
                         chunk.cubes.push(CubeEntity {
                             pos,
                             target_pos: pos,
-                            vel: Vec3 { x: 0.0, y: 0.0, z: 0.0 },
+                            vel: Vec3 {
+                                x: 0.0,
+                                y: 0.0,
+                                z: 0.0,
+                            },
                             color: color_from_resource(res_idx),
                         });
                         cube_idx += 1;
@@ -239,14 +264,15 @@ static MAP_DIMENSIONS: Mutex<(u32, u32)> = Mutex::new((0, 0));
 static SUBSCRIBED: Mutex<bool> = Mutex::new(false);
 
 struct PlayerEntity {
-    id:        u32,
-    x:         u32,
-    y:         u32,
+    id: u32,
+    x: u32,
+    y: u32,
     direction: u32,
-    level:     u32,
+    level: u32,
 }
 
 static PLAYERS: LazyLock<Mutex<Vec<PlayerEntity>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+static GOLEM_MESH: LazyLock<GolemMesh> = LazyLock::new(|| parse_golem_mesh(GOLEM_OBJ));
 
 static TILE_RESOURCES: LazyLock<Mutex<Vec<[u32; 7]>>> = LazyLock::new(|| Mutex::new(Vec::new()));
 
@@ -529,7 +555,13 @@ fn apply_camera_physics(camera: &mut CameraState, dt: f32) {
     camera.position.z += camera.velocity.z * dt;
 }
 
-fn render_camera_and_grid(camera: &CameraState, ray_dir: &Vec3, cmds: &mut Vec<RenderCommand>, map_w: u32, map_h: u32) {
+fn render_camera_and_grid(
+    camera: &CameraState,
+    ray_dir: &Vec3,
+    cmds: &mut Vec<RenderCommand>,
+    map_w: u32,
+    map_h: u32,
+) {
     let target = Vec3 {
         x: camera.position.x + ray_dir.x,
         y: camera.position.y + ray_dir.y,
@@ -582,14 +614,227 @@ fn send_overlay_metrics(
 
 fn color_from_resource(resource_idx: usize) -> Color {
     match resource_idx {
-        0 => Color { r: 210, g: 140, b:  50, a: 255 },
-        1 => Color { r: 160, g: 160, b: 160, a: 255 },
-        2 => Color { r: 210, g: 190, b:  50, a: 255 },
-        3 => Color { r:  80, g: 200, b: 100, a: 255 },
-        4 => Color { r: 180, g:  80, b: 210, a: 255 },
-        5 => Color { r:  80, g: 180, b: 220, a: 255 },
-        _ => Color { r: 220, g:  50, b:  50, a: 255 },
+        0 => Color {
+            r: 210,
+            g: 140,
+            b: 50,
+            a: 255,
+        },
+        1 => Color {
+            r: 160,
+            g: 160,
+            b: 160,
+            a: 255,
+        },
+        2 => Color {
+            r: 210,
+            g: 190,
+            b: 50,
+            a: 255,
+        },
+        3 => Color {
+            r: 80,
+            g: 200,
+            b: 100,
+            a: 255,
+        },
+        4 => Color {
+            r: 180,
+            g: 80,
+            b: 210,
+            a: 255,
+        },
+        5 => Color {
+            r: 80,
+            g: 180,
+            b: 220,
+            a: 255,
+        },
+        _ => Color {
+            r: 220,
+            g: 50,
+            b: 50,
+            a: 255,
+        },
     }
+}
+
+struct GolemFace {
+    indices: Vec<usize>,
+    color: Color,
+}
+
+struct GolemMesh {
+    vertices: Vec<Vec3>,
+    faces: Vec<GolemFace>,
+    center_x: f32,
+    center_z: f32,
+    min_y: f32,
+}
+
+fn parse_golem_mesh(obj: &str) -> GolemMesh {
+    let mut vertices = Vec::new();
+    let mut faces = Vec::new();
+    let mut current_color = GOLEM_COLOR;
+
+    for line in obj.lines() {
+        let mut parts = line.split_whitespace();
+        match parts.next() {
+            Some("v") => {
+                let x = parts
+                    .next()
+                    .and_then(|part| part.parse().ok())
+                    .unwrap_or(0.0);
+                let y = parts
+                    .next()
+                    .and_then(|part| part.parse().ok())
+                    .unwrap_or(0.0);
+                let z = parts
+                    .next()
+                    .and_then(|part| part.parse().ok())
+                    .unwrap_or(0.0);
+                vertices.push(Vec3 { x, y, z });
+            }
+            Some("usemtl") => {
+                current_color = match parts.next() {
+                    Some("EYES") => GOLEM_EYE_COLOR,
+                    _ => GOLEM_COLOR,
+                };
+            }
+            Some("f") => {
+                let indices = parts
+                    .filter_map(|part| part.split('/').next())
+                    .filter_map(|idx| idx.parse::<usize>().ok())
+                    .filter_map(|idx| idx.checked_sub(1))
+                    .collect::<Vec<_>>();
+                if indices.len() >= 3 {
+                    faces.push(GolemFace {
+                        indices,
+                        color: current_color,
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let (mut min_x, mut max_x) = (f32::INFINITY, f32::NEG_INFINITY);
+    let (mut min_y, mut min_z, mut max_z) = (f32::INFINITY, f32::INFINITY, f32::NEG_INFINITY);
+    for vertex in &vertices {
+        min_x = min_x.min(vertex.x);
+        max_x = max_x.max(vertex.x);
+        min_y = min_y.min(vertex.y);
+        min_z = min_z.min(vertex.z);
+        max_z = max_z.max(vertex.z);
+    }
+
+    GolemMesh {
+        vertices,
+        faces,
+        center_x: (min_x + max_x) * 0.5,
+        center_z: (min_z + max_z) * 0.5,
+        min_y,
+    }
+}
+
+fn player_rotation(direction: u32) -> f32 {
+    match direction {
+        1 => PI,
+        2 => FRAC_PI_2,
+        3 => 0.0,
+        4 => -FRAC_PI_2,
+        _ => 0.0,
+    }
+}
+
+fn transform_golem_vertex(vertex: &Vec3, mesh: &GolemMesh, origin: Vec3, rotation: f32) -> Vec3 {
+    let local_x = (vertex.x - mesh.center_x) * GOLEM_SCALE;
+    let local_y = (vertex.y - mesh.min_y) * GOLEM_SCALE;
+    let local_z = (vertex.z - mesh.center_z) * GOLEM_SCALE;
+    let (sin, cos) = rotation.sin_cos();
+
+    Vec3 {
+        x: origin.x + local_x * cos - local_z * sin,
+        y: origin.y + local_y,
+        z: origin.z + local_x * sin + local_z * cos,
+    }
+}
+
+fn render_players_as_golems(
+    players: &[PlayerEntity],
+    cmds: &mut Vec<RenderCommand>,
+    map_w: u32,
+    map_h: u32,
+) {
+    let mesh = &*GOLEM_MESH;
+
+    for player in players {
+        let origin = Vec3 {
+            x: player.x as f32 - map_w as f32 / 2.0 + 0.5,
+            y: GOLEM_Y_OFFSET,
+            z: player.y as f32 - map_h as f32 / 2.0 + 0.5,
+        };
+        let rotation = player_rotation(player.direction);
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+
+        for face in &mesh.faces {
+            if face.indices.len() < 3 {
+                continue;
+            }
+
+            let new_indices = 3 * (face.indices.len() - 2);
+            if vertices.len() + face.indices.len() > GOLEM_MAX_VERTICES
+                || indices.len() + new_indices > GOLEM_MAX_INDICES
+            {
+                push_golem_mesh(&mut vertices, &mut indices, cmds);
+            }
+
+            let start_idx = vertices.len() as u16;
+            for &idx in &face.indices {
+                let Some(vertex) = mesh.vertices.get(idx) else {
+                    continue;
+                };
+                vertices.push(Vertex {
+                    position: transform_golem_vertex(vertex, mesh, origin, rotation),
+                    normal: Vec3 {
+                        x: 0.0,
+                        y: 1.0,
+                        z: 0.0,
+                    },
+                    uv: Vec2 { x: 0.0, y: 0.0 },
+                    color: face.color,
+                });
+            }
+
+            for idx in 1..face.indices.len() - 1 {
+                indices.extend_from_slice(&[
+                    start_idx,
+                    start_idx + idx as u16,
+                    start_idx + (idx + 1) as u16,
+                ]);
+            }
+        }
+
+        push_golem_mesh(&mut vertices, &mut indices, cmds);
+    }
+}
+
+fn push_golem_mesh(
+    vertices: &mut Vec<Vertex>,
+    indices: &mut Vec<u16>,
+    cmds: &mut Vec<RenderCommand>,
+) {
+    if indices.is_empty() {
+        vertices.clear();
+        return;
+    }
+
+    cmds.push(RenderCommand::Mesh3d(Mesh3dCmd {
+        vertices: std::mem::take(vertices),
+        indices: std::mem::take(indices),
+        texture_id: 0,
+    }));
 }
 
 fn render_chunks(
@@ -643,10 +888,8 @@ fn render_chunks(
                 && grab_c_idx == c_idx
                 && let Some(cube) = chunk.cubes.get(grab_cube_idx)
             {
-                let chunk_x_f =
-                    (cube.pos.x + (map_w as f32 / 2.0)) / (CHUNK_SIZE as f32);
-                let chunk_z_f =
-                    (cube.pos.z + (map_h as f32 / 2.0)) / (CHUNK_SIZE as f32);
+                let chunk_x_f = (cube.pos.x + (map_w as f32 / 2.0)) / (CHUNK_SIZE as f32);
+                let chunk_z_f = (cube.pos.z + (map_h as f32 / 2.0)) / (CHUNK_SIZE as f32);
 
                 let chunks_x = (map_w as usize) / CHUNK_SIZE;
                 let chunks_z = (map_h as usize) / CHUNK_SIZE;
@@ -885,11 +1128,11 @@ impl Guest for Module {
         let chunks_x = map_w as usize / CHUNK_SIZE.min(map_w as usize);
         let chunks_z = map_h as usize / CHUNK_SIZE.min(map_h as usize);
 
-        let cam_cx = (((camera.position.x + (map_w as f32 / 2.0)) / CHUNK_SIZE as f32)
-            .floor() as i32)
+        let cam_cx = (((camera.position.x + (map_w as f32 / 2.0)) / CHUNK_SIZE as f32).floor()
+            as i32)
             .clamp(0, chunks_x as i32 - 1);
-        let cam_cz = (((camera.position.z + (map_h as f32 / 2.0)) / CHUNK_SIZE as f32)
-            .floor() as i32)
+        let cam_cz = (((camera.position.z + (map_h as f32 / 2.0)) / CHUNK_SIZE as f32).floor()
+            as i32)
             .clamp(0, chunks_z as i32 - 1);
 
         let chunk_range = (RENDER_DISTANCE / CHUNK_SIZE as f32).ceil() as i32 + 1;
@@ -902,7 +1145,14 @@ impl Guest for Module {
                 if cx >= 0 && cx < chunks_x as i32 && cz >= 0 && cz < chunks_z as i32 {
                     let global_id = (cx as usize) * chunks_z + (cz as usize);
                     active_ids.push(global_id);
-                    get_or_create_chunk(&mut chunks, cx as usize, cz as usize, chunks_z, map_w, map_h);
+                    get_or_create_chunk(
+                        &mut chunks,
+                        cx as usize,
+                        cz as usize,
+                        chunks_z,
+                        map_w,
+                        map_h,
+                    );
                 }
             }
         }
@@ -936,32 +1186,11 @@ impl Guest for Module {
             &mut cmds,
             dt,
             map_w,
-            map_h
+            map_h,
         );
         {
             let players = PLAYERS.lock().unwrap();
-            let mut player_cubes = Vec::new();
-            for p in players.iter() {
-                let world_x = p.x as f32 - map_w as f32 / 2.0 + 0.5;
-                let world_z = p.y as f32 - map_h as f32 / 2.0 + 0.5;
-                let color = match p.direction {
-                    1 => Color { r: 255, g: 255, b: 100, a: 255 },
-                    2 => Color { r: 100, g: 255, b: 100, a: 255 },
-                    3 => Color { r: 100, g: 100, b: 255, a: 255 },
-                    4 => Color { r: 255, g: 100, b: 100, a: 255 },
-                    _ => Color { r: 255, g: 255, b: 255, a: 255 },
-                };
-                player_cubes.push(CubeCmd {
-                    position: Vec3 { x: world_x, y: CUBE_HIGHT, z: world_z },
-                    size: Vec3 { x: PLAYER_CUBE_SIZE, y: PLAYER_CUBE_SIZE, z: PLAYER_CUBE_SIZE },
-                    color,
-                });
-            }
-            if !player_cubes.is_empty() {
-                cmds.push(RenderCommand::InstancedCubes(InstancedCubesCmd {
-                    cubes: player_cubes,
-                }));
-            }
+            render_players_as_golems(&players, &mut cmds, map_w, map_h);
         }
         send_overlay_metrics(rendered_cubes, &camera, *grab_state);
         cmds
@@ -1019,26 +1248,34 @@ impl Guest for Module {
             "zappy:player_new" => {
                 let parts: Vec<&str> = payload.split_whitespace().collect();
                 if parts.len() == PLAYER_NEW_FIELD_COUNT {
-                    let id:  u32 = parts[0].parse().unwrap_or(0);
-                    let x:   u32 = parts[1].parse().unwrap_or(0);
-                    let y:   u32 = parts[2].parse().unwrap_or(0);
+                    let id: u32 = parts[0].parse().unwrap_or(0);
+                    let x: u32 = parts[1].parse().unwrap_or(0);
+                    let y: u32 = parts[2].parse().unwrap_or(0);
                     let dir: u32 = parts[3].parse().unwrap_or(1);
                     let lvl: u32 = parts[4].parse().unwrap_or(1);
                     let mut players = PLAYERS.lock().unwrap();
                     players.retain(|p| p.id != id);
-                    players.push(PlayerEntity { id, x, y, direction: dir, level: lvl });
+                    players.push(PlayerEntity {
+                        id,
+                        x,
+                        y,
+                        direction: dir,
+                        level: lvl,
+                    });
                 }
             }
             "zappy:player_move" => {
                 let parts: Vec<&str> = payload.split_whitespace().collect();
                 if parts.len() == PLAYER_MOVE_FIELD_COUNT {
-                    let id:  u32 = parts[0].parse().unwrap_or(0);
-                    let x:   u32 = parts[1].parse().unwrap_or(0);
-                    let y:   u32 = parts[2].parse().unwrap_or(0);
+                    let id: u32 = parts[0].parse().unwrap_or(0);
+                    let x: u32 = parts[1].parse().unwrap_or(0);
+                    let y: u32 = parts[2].parse().unwrap_or(0);
                     let dir: u32 = parts[3].parse().unwrap_or(1);
                     let mut players = PLAYERS.lock().unwrap();
                     if let Some(p) = players.iter_mut().find(|p| p.id == id) {
-                        p.x = x; p.y = y; p.direction = dir;
+                        p.x = x;
+                        p.y = y;
+                        p.direction = dir;
                     }
                 }
             }

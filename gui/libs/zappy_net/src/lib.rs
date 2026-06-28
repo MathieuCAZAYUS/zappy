@@ -156,7 +156,7 @@ fn parse_line(line: &str, state: &mut GameState) {
             state.players.push(Player { id, x, y, direction: dir, level: lvl, team, 
                 inv_food: 0, inv_linemate: 0, inv_deraumere: 0, inv_sibur: 0, 
                 inv_mendiane: 0, inv_phiras: 0, inv_thystame: 0,});
-            emit_event("zappy:player_new", &format!("{} {} {}", id, x, y));
+            emit_event("zappy:player_new", &format!("{} {} {} {} {}", id, x, y, dir, lvl));
         }
 
         "ppo" if parts.len() == PPO_FIELD_COUNT => {
@@ -168,7 +168,7 @@ fn parse_line(line: &str, state: &mut GameState) {
             if let Some(p) = state.players.iter_mut().find(|p| p.id == id) {
                 p.x = x; p.y = y; p.direction = dir;
             }
-            emit_event("zappy:player_move", &format!("{} {} {}", id, x, y));
+            emit_event("zappy:player_move", &format!("{} {} {} {}", id, x, y, dir));
         }
 
         "plv" if parts.len() == PLV_FIELD_COUNT => {

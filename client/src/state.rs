@@ -138,11 +138,11 @@ impl GameState {
         mask[17] = self.inventory[5] > 0;
         mask[18] = self.inventory[6] > 0;
 
-        mask[19] = self.inventory[0] > 0;
+        mask[19] = false;
 
         mask[20] = true;
-        mask[21] = true;
-        mask[22] = true;
+        mask[21] = false;
+        mask[22] = false;
 
         mask
     }
@@ -512,10 +512,10 @@ fn test_mask_eject_requires_other_player_on_tile() {
 fn test_mask_eat_requires_food_in_inventory() {
     let mut s = empty_state();
     s.inventory[0] = 0;
-    assert!(!s.valid_mask()[19], "Eat blocked with no food");
+    assert!(!s.valid_mask()[19], "Eat is not a server command");
 
     s.inventory[0] = 1;
-    assert!(s.valid_mask()[19], "Eat allowed with food");
+    assert!(!s.valid_mask()[19], "Eat is not a server command");
 }
 
 #[test]

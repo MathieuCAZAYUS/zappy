@@ -30,7 +30,7 @@ const EVENT_LOAD: &str = "obj_viewer:load_full_scene";
 const EVENT_SET_SCALE: &str = "obj_viewer:set_scale";
 const EVENT_SET_POS: &str = "obj_viewer:set_position";
 const EVENT_SET_ROT: &str = "obj_viewer:set_rotation";
-const MAP_SIZE_PARTS: u32 = 2; 
+const MAP_SIZE_PARTS: usize = 2;
 const MAP_SIZE_SCALE: f32 = 0.2;
 
 #[derive(Serialize, Deserialize, Clone)]

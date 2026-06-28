@@ -6,6 +6,8 @@ use crate::protocol::{ServerResponse, action_to_command, parse_response};
 use crate::state::{GameState, TICKS_PER_FOOD};
 
 const CMD_BUFFER_LIMIT: usize = 10;
+const MAX_STATIONARY_ACTIONS: usize = 4;
+const FORWARD_COMMAND: &str = "Forward";
 
 pub struct ZappyClient {
     reader: BufReader<TcpStream>,
@@ -14,6 +16,20 @@ pub struct ZappyClient {
     pending: usize,
     state: Option<GameState>,
     response_queue: Vec<ServerResponse>,
+    stationary_actions: usize,
+}
+
+fn is_command_response(resp: &ServerResponse) -> bool {
+    matches!(
+        resp,
+        ServerResponse::Ok
+            | ServerResponse::Ko
+            | ServerResponse::Dead
+            | ServerResponse::Look(_)
+            | ServerResponse::Inventory { .. }
+            | ServerResponse::ConnectNbr(_)
+            | ServerResponse::ElevationUnderway
+    )
 }
 
 impl ZappyClient {
@@ -66,12 +82,13 @@ impl ZappyClient {
             pending: 0,
             state: Some(GameState::new(map_w, map_h)),
             response_queue: Vec::new(),
+            stationary_actions: 0,
         })
     }
 
     fn send(&mut self, cmd: &str) -> anyhow::Result<()> {
         if self.pending >= CMD_BUFFER_LIMIT {
-            self.recv_one()?;
+            self.recv_command_response()?;
         }
         let msg = format!("{cmd}\n");
         self.writer.write_all(msg.as_bytes())?;
@@ -95,18 +112,28 @@ impl ZappyClient {
             eprintln!("[AI ←] {trimmed}");
 
             if let Some(resp) = parse_response(trimmed) {
-                if self.pending > 0 {
-                    self.pending -= 1;
-                }
                 return Ok(resp);
             }
             eprintln!("[AI] Unknown server line: {trimmed:?}");
         }
     }
 
+    fn recv_command_response(&mut self) -> anyhow::Result<ServerResponse> {
+        loop {
+            let resp = self.recv_one()?;
+            if is_command_response(&resp) {
+                if self.pending > 0 {
+                    self.pending -= 1;
+                }
+                return Ok(resp);
+            }
+            self.handle_unsolicited(resp);
+        }
+    }
+
     fn drain_pending(&mut self) -> anyhow::Result<()> {
         while self.pending > 0 {
-            let resp = self.recv_one()?;
+            let resp = self.recv_command_response()?;
             self.handle_unsolicited(resp);
         }
         Ok(())
@@ -140,6 +167,22 @@ impl ZappyClient {
         }
     }
 
+    fn movement_guard_command(&mut self, selected: &'static str) -> &'static str {
+        if selected == FORWARD_COMMAND {
+            self.stationary_actions = 0;
+            return selected;
+        }
+
+        self.stationary_actions += 1;
+        if self.stationary_actions >= MAX_STATIONARY_ACTIONS {
+            self.stationary_actions = 0;
+            eprintln!("[AI] Movement guard forced Forward after stationary actions");
+            FORWARD_COMMAND
+        } else {
+            selected
+        }
+    }
+
     fn refresh_state(&mut self) -> anyhow::Result<()> {
         self.send("Look")?;
         self.send("Inventory")?;
@@ -148,7 +191,7 @@ impl ZappyClient {
         let mut got_inv = false;
 
         while !got_look || !got_inv {
-            let resp = self.recv_one()?;
+            let resp = self.recv_command_response()?;
             let state = self.state.as_mut().unwrap();
             match resp {
                 ServerResponse::Look(tiles) => {
@@ -187,11 +230,11 @@ impl ZappyClient {
                 let mask = state.valid_mask();
                 agent.act(&sv, &mask)
             };
-            let cmd = action_to_command(action);
+            let cmd = self.movement_guard_command(action_to_command(action));
             eprintln!("[AI] Action {action} → {cmd}");
 
             self.send(cmd)?;
-            let resp = self.recv_one()?;
+            let resp = self.recv_command_response()?;
 
             match resp {
                 ServerResponse::Dead => {
