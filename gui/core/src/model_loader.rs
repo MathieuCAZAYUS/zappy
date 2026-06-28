@@ -8,13 +8,14 @@ const INITIAL_ID: u32 = 1;
 const ID_INCREMENT: u32 = 1;
 
 const MODELS_ROOT_PATH: &str = "assets/models";
-const OBJ_FILE: &str = "model.obj";
+const OBJ_FILE: &str = "Island.obj";
 const MTLLIB_KEY: &str = "mtllib";
 const MAP_KD_KEY: &str = "map_Kd";
 const MAP_BUMP_KEY: &str = "map_Bump";
 const MAP_NS_KEY: &str = "map_Ns";
 const DEFAULT_FLOAT: f32 = 0.0;
-const DEFAULT_SCALE: f32 = 0.2;
+const DEFAULT_HIGHT_FLOAT: f32 = -19.5;
+const DEFAULT_SCALE: f32 = 2.0;
 
 pub struct TextureRegistry {
     pub loaded_textures: HashMap<u32, Texture2D>,
@@ -118,7 +119,7 @@ pub fn load_folder(dir: &Path, reg: &mut TextureRegistry) -> Option<FullModelPay
         textures,
         scale: DEFAULT_SCALE,
         pos_x: DEFAULT_FLOAT,
-        pos_y: DEFAULT_FLOAT,
+        pos_y: DEFAULT_HIGHT_FLOAT,
         pos_z: DEFAULT_FLOAT,
         rotation_speed: DEFAULT_FLOAT,
     })

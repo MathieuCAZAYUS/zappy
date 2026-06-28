@@ -73,9 +73,9 @@ const MIN_CAMERA_SPEED: f32 = 0.1;
 const MAX_CAMERA_SPEED: f32 = 10.0;
 const SPHERE_INTERSECT_RADIUS: f32 = 0.25;
 const MAX_WISH_DIR_LEN: f32 = 1.0;
-const MAX_CUBES_PER_RESOURCE: f32 = 5;
+const MAX_CUBES_PER_RESOURCE: u32 = 5;
 const CUBE_HIGHT: f32 = 0.5;
-const CUBE_SIZE: f32 = 0.4;
+const PLAYER_CUBE_SIZE: f32 = 0.4;
 
 const CAMERA_FOVY: f32 = 70.0;
 const GRID_SPACING: f32 = 0.5;
@@ -85,9 +85,9 @@ const LASER_OFFSET_FORWARD: f32 = 0.5;
 const LASER_OFFSET_SIDE: f32 = 0.2;
 const LASER_OFFSET_DOWN: f32 = 0.2;
 const DEFAULT_ASPECT_RATIO: f32 = 1.33;
-const TILE_UPDATE_FIELD_COUNT: f32 = 9;
-const PLAYER_NEW_FIELD_COUNT: f32 = 5;
-const PLAYER_MOVE_FIELD_COUNT: f32 = 4;
+const TILE_UPDATE_FIELD_COUNT: usize = 9;
+const PLAYER_NEW_FIELD_COUNT: usize = 5;
+const PLAYER_MOVE_FIELD_COUNT: usize = 4;
 
 const COLOR_RED: Color = Color {
     r: 255,
@@ -953,7 +953,7 @@ impl Guest for Module {
                 };
                 player_cubes.push(CubeCmd {
                     position: Vec3 { x: world_x, y: CUBE_HIGHT, z: world_z },
-                    size: Vec3 { x: CUBE_SIZE, y: CUBE_SIZE, z: CUBE_SIZE },
+                    size: Vec3 { x: PLAYER_CUBE_SIZE, y: PLAYER_CUBE_SIZE, z: PLAYER_CUBE_SIZE },
                     color,
                 });
             }

@@ -49,29 +49,29 @@ struct GameState {
     teams:   Vec<String>,
 }
 
-const MSZ_FIELD_COUNT: f32 = 3;
-const SGT_FIELD_COUNT: f32 = 2;
-const BCT_FIELD_COUNT: f32 = 10;
-const TNA_FIELD_COUNT: f32 = 2;
-const PNW_FIELD_COUNT: f32 = 7;
-const PPO_FIELD_COUNT: f32 = 5;
-const PLV_FIELD_COUNT: f32 = 3;
-const PDI_FIELD_COUNT: f32 = 2;
-const SEG_FIELD_COUNT: f32 = 2;
-const PIN_FIELD_COUNT: f32 = 11;
-const PEX_FIELD_COUNT: f32 = 2;
-const PIE_FIELD_COUNT: f32 = 4;
-const PFK_FIELD_COUNT: f32 = 2;
-const PDR_FIELD_COUNT: f32 = 3;
-const PGT_FIELD_COUNT: f32 = 3;
-const ENW_FIELD_COUNT: f32 = 5;
-const EBO_FIELD_COUNT: f32 = 2;
-const EDI_FIELD_COUNT: f32 = 2;
-const SST_FIELD_COUNT: f32 = 2;
+const MSZ_FIELD_COUNT: usize = 3;
+const SGT_FIELD_COUNT: usize = 2;
+const BCT_FIELD_COUNT: usize = 10;
+const TNA_FIELD_COUNT: usize = 2;
+const PNW_FIELD_COUNT: usize = 7;
+const PPO_FIELD_COUNT: usize = 5;
+const PLV_FIELD_COUNT: usize = 3;
+const PDI_FIELD_COUNT: usize = 2;
+const SEG_FIELD_COUNT: usize = 2;
+const PIN_FIELD_COUNT: usize = 11;
+const PEX_FIELD_COUNT: usize = 2;
+const PIE_FIELD_COUNT: usize = 4;
+const PFK_FIELD_COUNT: usize = 2;
+const PDR_FIELD_COUNT: usize = 3;
+const PGT_FIELD_COUNT: usize = 3;
+const ENW_FIELD_COUNT: usize = 5;
+const EBO_FIELD_COUNT: usize = 2;
+const EDI_FIELD_COUNT: usize = 2;
+const SST_FIELD_COUNT: usize = 2;
 
-const PBC_MIN_FIELD_COUNT: f32 = 3;
-const PIC_MIN_FIELD_COUNT: f32 = 4;
-const SMG_MIN_FIELD_COUNT: f32 = 2;
+const PBC_MIN_FIELD_COUNT: usize = 3;
+const PIC_MIN_FIELD_COUNT: usize = 4;
+const SMG_MIN_FIELD_COUNT: usize = 2;
 
 impl GameState {
     fn new() -> Self {

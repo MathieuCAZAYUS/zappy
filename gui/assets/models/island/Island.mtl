@@ -1,0 +1,5 @@
+newmtl Ground
+Kd 0.15 0.07 0.02
+
+newmtl Material.001
+Kd 0.3 0.7 0.2
