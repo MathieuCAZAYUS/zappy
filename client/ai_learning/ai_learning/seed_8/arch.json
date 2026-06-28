@@ -1,0 +1,11 @@
+{
+  "layer_dims": [
+    601,
+    128,
+    64,
+    22
+  ],
+  "state_dim": 601,
+  "n_actions": 22,
+  "team": "a"
+}

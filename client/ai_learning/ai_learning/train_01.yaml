@@ -1,0 +1,30 @@
+SEED: 1
+
+# --- environment ---
+MAP_SIZE: [20, 20]        # small enough to find resources easily early in training
+MAX_EPISODE_TICKS: 8000
+
+# --- population ---
+N_TEAMS: 2
+POP_SIZE: 100             # 50 agents per team, good balance speed/diversity
+MAX_TEAM_SIZE: 50         # in order to limit fork
+
+# --- network ---
+# state_dim computed at runtime, don't set here
+HIDDEN_LAYERS: [128, 64]  # layer_dims becomes [state_dim, 128, 64, 22]
+                          # start simple, add layers if agents plateau early
+
+# --- evolution ---
+N_GENERATIONS: 500
+ELITE_FRAC: 0.2           # keep top 20% = 10 agents per team
+MUTATION_STD: 0.02        # small perturbations, safe starting point
+FORK_MUTATION_STD: 0.005  # in-game reproduction, very conservative
+
+# --- fitness weights ---
+LEVEL_WEIGHT: 1000        # dominant signal
+SURVIVAL_WEIGHT: 0.1      # small, prevents suicidal behavior
+STONES_WEIGHT: 5          # intermediate reward for resource collection
+
+# --- training control ---
+WIN_STREAK_STOP: 50       # stop if one team wins 50 consecutive episodes
+CHECKPOINT_INTERVAL: 20   # save best genome every 20 generations

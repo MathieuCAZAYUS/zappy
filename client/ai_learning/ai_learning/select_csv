@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+
+import csv
+from sys import argv
+import pandas as pd
+
+if __name__ == "__main__":
+    csv_name = argv[1]
+    df = pd.read_csv(csv_name)
+    sampled_df = df[df["gen"] % 50 == 0]
+
+    output_path = csv_name.replace(".csv", "_sample.csv")
+    sampled_df.to_csv(output_path, index=False)

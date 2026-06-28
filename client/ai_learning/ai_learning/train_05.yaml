@@ -1,0 +1,25 @@
+SEED: 5
+
+# --- environment ---
+MAP_SIZE: [20, 20]        # small enough to find resources easily early in training
+MAX_EPISODE_TICKS: 12000
+
+# --- population ---
+N_TEAMS: 2
+POP_SIZE: 500             # 100 genomes choosen a random
+MAX_TEAM_SIZE: 50         # in order to limit fork
+TEAM_EPISODE_SIZE: 20     # Number of genome which will play each gen
+
+# --- network ---
+# state_dim computed at runtime
+HIDDEN_LAYERS: [64]  # [128, 64]
+
+# --- evolution ---
+N_GENERATIONS: 5000
+ELITE_FRAC: 0.1           # keep top 10%
+MUTATION_STD: 0.1
+FORK_MUTATION_STD: 0.01   # in-game reproduction, very conservative
+
+# --- training control ---
+WIN_STREAK_STOP: 50       # stop if one team wins 50 consecutive episodes
+CHECKPOINT_INTERVAL: 20   # save best genome every 20 generations
